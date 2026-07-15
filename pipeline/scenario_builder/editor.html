@@ -88,6 +88,19 @@
         color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;z-index:50;
         max-width:80vw;box-shadow:0 2px 10px rgba(0,0,0,.3)}
  #toast[hidden]{display:none}
+ #helpBtn{margin-left:auto}
+ #guideModal{position:fixed;inset:0;z-index:40;background:rgba(20,30,45,.56);display:flex;align-items:center;justify-content:center;padding:20px}
+ #guideModal[hidden]{display:none}
+ .guide-card{width:min(780px,100%);max-height:min(760px,calc(100vh - 40px));overflow:auto;box-sizing:border-box;background:#fff;border-radius:12px;padding:24px 26px;box-shadow:0 16px 50px rgba(0,0,0,.28);position:relative}
+ .guide-card h2{margin:0 36px 8px 0;font-size:22px;color:#1a4fa0}
+ .guide-card h3{font-size:14px;margin:20px 0 7px;color:#333}
+ .guide-card p,.guide-card li{font-size:14px;line-height:1.5;color:#444}
+ .guide-card ol{padding-left:22px;margin:7px 0}
+ .guide-card .context{background:#eef4fe;border-left:4px solid #1a73e8;padding:10px 13px;border-radius:4px}
+ .guide-close{position:absolute;right:14px;top:12px;border:0;background:transparent;font-size:24px;color:#555;cursor:pointer;line-height:1}
+ .guide-actions{display:flex;justify-content:flex-end;margin-top:20px}
+ .guide-actions button{font-size:14px;padding:7px 13px;cursor:pointer;background:#1a73e8;color:#fff;border:0;border-radius:5px}
+ @media (max-width:760px){#helpBtn{margin-left:0}.guide-card{padding:20px}.guide-card p,.guide-card li{font-size:13px}}
 </style>
 </head>
 <body>
@@ -110,8 +123,28 @@
   <input id="loadSpecFile" type="file" accept="application/json" style="display:none">
   <button id="importAlertsBtn" title="reverse an existing synthetic_alerts.jsonl (any stage's demo output) back into an editable scenario">Import alerts (.jsonl)</button>
   <input id="importAlertsFile" type="file" accept=".jsonl,.json,application/jsonl" style="display:none">
+  <button id="helpBtn" type="button">About &amp; guide</button>
 </div>
 
+<div id="guideModal" role="dialog" aria-modal="true" aria-labelledby="guideTitle" hidden>
+  <div class="guide-card">
+    <button class="guide-close" id="guideClose" type="button" aria-label="Close guide">&times;</button>
+    <h2 id="guideTitle">UnraveledPlayer: from an attack sketch to SIEM-style alerts</h2>
+    <p class="context">This portfolio prototype supports research on augmenting SIEM operations with threat-model knowledge. A static threat model tells us the attack paths that are possible; the goal is to combine that knowledge with incoming alerts to infer an attacker’s intent, track compromised components, and anticipate the next likely target.</p>
+    <h3>Why this tool exists</h3>
+    <p>Real multi-attacker APT data is scarce. The Unraveled dataset provides a stand-in SIEM feed, but contains one campaign, so this editor lets me visually author synthetic, interleaved attacks. The diagram is the input: each move becomes time-ordered OCSF-style alerts that can exercise multi-attacker attribution and compromise-state tracking.</p>
+    <h3>Try it in four steps</h3>
+    <ol>
+      <li><b>Choose a topology</b> at the top. Grey nodes have no pinned IP, so they cannot be used as move endpoints.</li>
+      <li><b>Set up an attacker</b> in the Attackers panel. Select its row to make it the current attacker; add another attacker to model concurrent activity.</li>
+      <li><b>Draw moves on the diagram:</b> click a source (or <i>EXTERNAL</i> for initial access), then click a destination. Repeat to build the attack path. Edit techniques, ports, and timestamps in the timeline; drag rows to interleave attackers.</li>
+      <li><b>Compile &amp; validate.</b> Review the report, download the generated <code>synthetic_alerts.jsonl</code>, then switch to <b>Inferred sessions</b> to compare your authored attackers with the engine’s attribution.</li>
+    </ol>
+    <h3>Playback and useful controls</h3>
+    <p>Use the slider or play button to replay the scenario in time order. Colored dots show attackers that have touched a node; click a legend chip to focus one attacker. Save/load preserves a scenario as JSON, while Import alerts reverses a previously generated JSONL file back into an editable scenario.</p>
+    <div class="guide-actions"><button id="guideStart" type="button">Start exploring</button></div>
+  </div>
+</div>
 <div id="layout">
   <div id="canvasWrap">
     <div id="stepBar">
@@ -178,6 +211,7 @@
 const PALETTE = ["#1a73e8","#d1383a","#2e9e5b","#e0a500","#8e44ad","#00897b","#c2185b","#5d4037"];
 const STORAGE_KEY = "scenario_builder_spec";
 const DEFAULT_TECH_KEY = "scenario_builder_default_tech";
+const GUIDE_SEEN_KEY = "scenario_builder_guide_seen";
 // inferred node compromise state -> color / ordinal (mirrors stage4 visualize.py)
 const STATE_COLOR = {CLEAN:"#2e9e5b", ACCESSED:"#e0a500", COMPROMISED:"#d1383a"};
 const STATE_RANK  = {CLEAN:0, ACCESSED:1, COMPROMISED:2};
@@ -214,6 +248,12 @@ function toast(msg) {
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
 }
+
+function closeGuide() {
+  document.getElementById('guideModal').hidden = true;
+  localStorage.setItem(GUIDE_SEEN_KEY, 'true');
+}
+function openGuide() { document.getElementById('guideModal').hidden = false; }
 
 function loadLocal() {
   try {
@@ -1224,7 +1264,9 @@ document.getElementById('playBtn').onclick = () => {
 
 // cancel a pending source: Esc, or a click on empty canvas / zone background
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape') cancelPending();
+  if (ev.key !== 'Escape') return;
+  if (!document.getElementById('guideModal').hidden) closeGuide();
+  else cancelPending();
 });
 stage.addEventListener('click', (ev) => {
   const t = ev.target;
@@ -1238,6 +1280,11 @@ stage.addEventListener('click', (ev) => {
 window.addEventListener('resize', redrawMoveLines);
 new ResizeObserver(redrawMoveLines).observe(stage);
 
+document.getElementById('helpBtn').onclick = openGuide;
+document.getElementById('guideClose').onclick = closeGuide;
+document.getElementById('guideStart').onclick = closeGuide;
+document.getElementById('guideModal').onclick = (ev) => { if (ev.target.id === 'guideModal') closeGuide(); };
+if (!localStorage.getItem(GUIDE_SEEN_KEY)) openGuide();
 // ---------------------------------------------------------------- init
 
 document.getElementById('topologySelect').value = state.topology;
