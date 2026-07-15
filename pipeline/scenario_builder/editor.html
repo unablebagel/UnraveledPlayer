@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>scenario_builder — attacker scenario editor</title>
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#fafafa;color:#222}
+ #bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#fff;
+      border-bottom:1px solid #ddd;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+ #bar select,#bar button{font-size:14px;padding:6px 10px;cursor:pointer}
+ #bar input[type=number]{width:150px;padding:5px}
+ #bar label{font-size:12px;color:#555;display:flex;align-items:center;gap:4px}
+ #layout{display:flex;gap:14px;padding:14px;align-items:flex-start}
+ #canvasWrap{flex:2;min-width:0;max-width:100%;overflow:auto}
+ #stage{position:relative;background:#fff;border:1px solid #ccc;border-radius:8px;
+        display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:40px;align-items:start;padding:14px;min-height:220px}
+ #stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+ .zone{position:relative;border:1px solid #bbb;border-radius:8px;padding:26px 16px 16px;
+       flex:0 1 auto; min-width: 140px;}
+ .zlabel{position:absolute;font-size:12px;color:#555;left:8px;top:5px}
+ .zone .nodes{display:grid;gap:14px 10px;justify-content:center}
+ .node{position:relative;text-align:center;cursor:pointer;user-select:none}
+ .nbox{border:2px solid #999;border-radius:6px;background:#fff;padding:4px 3px;
+       font-size:10px;line-height:1.2}
+ .nbox .nm{font-weight:600}
+ .nbox .ip{color:#888;font-size:9px}
+ .node.noip .nbox{opacity:.4;cursor:not-allowed}
+ .node.selected .nbox{border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.25)}
+ #stage.picking-dst .node:not(.noip) .nbox,#stage.picking-dst #external{cursor:crosshair}
+ #external{flex:0 0 110px;align-self:flex-start;padding:8px;text-align:center;
+           border:2px dashed #888;border-radius:8px;background:#fff;cursor:pointer;
+           font-size:12px;user-select:none}
+ #external.selected{border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.25)}
+ #sidebar{flex:1;min-width:340px;display:flex;flex-direction:column;gap:14px}
+ .panel{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px}
+ .panel h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.03em;
+           color:#555}
+ table{width:100%;border-collapse:collapse;font-size:12px}
+ th,td{border-bottom:1px solid #eee;padding:4px 3px;text-align:left;vertical-align:middle}
+ input[type=text],input[type=number],select{font-size:12px;padding:3px 4px;width:100%;
+       box-sizing:border-box}
+ .swatch{width:14px;height:14px;border-radius:50%;display:inline-block;flex:none}
+ .row-btn{cursor:pointer;background:none;border:none;font-size:14px;color:#a33;padding:2px 5px}
+ .add-btn{font-size:12px;padding:5px 9px;cursor:pointer;margin-top:6px}
+ .drag-handle{cursor:grab;color:#999}
+ tr.dragging{opacity:.4}
+ tr.current-attacker{outline:2px solid #1a73e8}
+ #report{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;background:#1b1b1b;
+         color:#d6d6d6;padding:10px;border-radius:6px;max-height:260px;overflow:auto}
+ #report.err{color:#ff8a80}
+ .hint{font-size:11px;color:#777;margin:4px 0 0}
+ #stepBar{display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:8px;
+          background:#eef4fe;border:1px solid #c6dafc;border-radius:8px;font-size:13px}
+ #stepBar.warn{background:#fff4e0;border-color:#f2c98a}
+ #stepBar .swatch{width:14px;height:14px;border-radius:50%}
+ #stepBar b{white-space:nowrap}
+ #stepMsg b{color:#1a4fa0}
+ .tech-select{border:1px solid #9db8e6;background:#f5f9ff;border-radius:4px}
+ tr.flash{animation:rowflash 1.6s ease-out}
+ @keyframes rowflash{from{background:#fff3cd}to{background:transparent}}
+ #playBar{display:flex;align-items:center;gap:10px;padding:7px 12px;margin-bottom:8px;
+          background:#fff;border:1px solid #ddd;border-radius:8px;font-size:12px;flex-wrap:wrap}
+ #playBar input[type=range]{flex:1;min-width:140px;accent-color:#1a73e8}
+ #playBar button{font-size:13px;padding:3px 10px;cursor:pointer}
+ #stepCount{font-family:Consolas,monospace;color:#555;white-space:nowrap}
+ #legend{display:flex;gap:6px;flex-wrap:wrap}
+ .legend-chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border:1px solid #ccc;
+              border-radius:12px;cursor:pointer;background:#fff;user-select:none;font-size:12px}
+ .legend-chip.focused{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.25)}
+ .legend-chip.dimmed{opacity:.35}
+ .node .marks{position:absolute;top:-6px;right:-4px;display:flex;gap:2px;pointer-events:none;z-index:4}
+ .node .marks .dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;
+                   box-shadow:0 1px 2px rgba(0,0,0,.35)}
+ .node .marks .sdot{width:14px;height:14px;font:700 9px Segoe UI,Arial,sans-serif;color:#fff;
+                    display:flex;align-items:center;justify-content:center;
+                    text-shadow:0 0 2px rgba(0,0,0,.55)}
+ .nbox.sess-COMPROMISED{border-color:#d1383a;box-shadow:0 0 0 2px rgba(209,56,58,.28)}
+ .nbox.sess-ACCESSED{border-color:#e0a500;box-shadow:0 0 0 2px rgba(224,165,0,.28)}
+ .nbox.sess-CLEAN{border-color:#2e9e5b}
+ #viewToggle{display:inline-flex;border:1px solid #c6dafc;border-radius:14px;overflow:hidden}
+ #viewToggle button{border:none;background:#fff;padding:3px 10px;cursor:pointer;color:#555;font-size:12px}
+ #viewToggle button.active{background:#1a73e8;color:#fff}
+ @keyframes dashflow{to{stroke-dashoffset:-28}}
+ .cur-move{stroke-dasharray:9 5;animation:dashflow .5s linear infinite}
+ .mv-badge{cursor:pointer;pointer-events:auto}
+ .mv-badge text{font:600 9px Segoe UI,Arial,sans-serif;dominant-baseline:central;text-anchor:middle}
+ #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;
+        color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;z-index:50;
+        max-width:80vw;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+ #toast[hidden]{display:none}
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <label>Topology
+    <select id="topologySelect">
+      <option value="segmented">segmented</option>
+      <option value="unraveled">unraveled</option>
+      <option value="toy">toy</option>
+    </select>
+  </label>
+  <label>Base time (ms) <input id="baseTime" type="number"></label>
+  <label>Step (ms) <input id="stepMs" type="number"></label>
+  <label>Default technique <select id="defaultTech" title="Technique auto-assigned to new non-foothold moves; edit any move's technique in the timeline"></select></label>
+  <button id="compileBtn">Compile &amp; validate</button>
+  <button id="downloadBtn" disabled>Download jsonl</button>
+  <button id="saveSpecBtn">Save spec</button>
+  <button id="loadSpecBtn">Load spec</button>
+  <input id="loadSpecFile" type="file" accept="application/json" style="display:none">
+  <button id="importAlertsBtn" title="reverse an existing synthetic_alerts.jsonl (any stage's demo output) back into an editable scenario">Import alerts (.jsonl)</button>
+  <input id="importAlertsFile" type="file" accept=".jsonl,.json,application/jsonl" style="display:none">
+</div>
+
+<div id="layout">
+  <div id="canvasWrap">
+    <div id="stepBar">
+      <span class="swatch" id="stepSwatch"></span>
+      <b id="stepAttacker"></b>
+      <span id="stepMsg"></span>
+    </div>
+    <div id="playBar">
+      <button id="playBtn" title="replay the attack progression move by move">▶</button>
+      <input id="stepSlider" type="range" min="0" max="0" value="0"
+             title="show only the first N moves of the interleaved timeline">
+      <span id="stepCount">0 / 0</span>
+      <span id="viewToggle" title="switch the diagram between what you authored and what the engine infers">
+        <button id="viewAuthored" class="active">Authored</button>
+        <button id="viewSessions" title="sessions the engine infers (S0…S3) — Compile first">Inferred sessions</button>
+      </span>
+      <span id="legend"></span>
+    </div>
+    <div id="stage"></div>
+    <p class="hint">Greyed nodes have no pinned IP and can't be move endpoints. Drag timeline
+    rows to reorder. New moves get the <b>default technique</b> above (footholds use the
+    attacker's initial-access) — change any move's technique in the timeline.
+    Numbered badges give each move's position in the interleaved timeline; drag the slider
+    (or press ▶) to replay the progression. Dots on a node mark the attackers who have
+    touched it; click a legend chip to isolate one attacker's session.</p>
+  </div>
+
+  <div id="sidebar">
+    <div class="panel">
+      <h3>Attackers</h3>
+      <table id="rosterTable">
+        <thead><tr><th></th><th>name</th><th>entry ip</th><th>initial access</th>
+        <th>prov</th><th>port</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button class="add-btn" id="addAttackerBtn">+ add attacker</button>
+      <p class="hint">The highlighted row is the <b>current attacker</b> (also shown in the
+      step bar above the canvas) -- click a row to select it before clicking nodes.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Move timeline (interleaving = row order)</h3>
+      <table id="movesTable">
+        <thead><tr><th></th><th>#</th><th>attacker</th><th>src</th><th>dst</th><th>technique</th>
+        <th>port</th><th>t</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="hint">Drag rows to reorder. Blank <b>t</b> = base_time / previous-t + step_ms.
+      Explicit <b>t</b> always wins.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Validation report</h3>
+      <pre id="report">(not compiled yet)</pre>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+
+const PALETTE = ["#1a73e8","#d1383a","#2e9e5b","#e0a500","#8e44ad","#00897b","#c2185b","#5d4037"];
+const STORAGE_KEY = "scenario_builder_spec";
+const DEFAULT_TECH_KEY = "scenario_builder_default_tech";
+// inferred node compromise state -> color / ordinal (mirrors stage4 visualize.py)
+const STATE_COLOR = {CLEAN:"#2e9e5b", ACCESSED:"#e0a500", COMPROMISED:"#d1383a"};
+const STATE_RANK  = {CLEAN:0, ACCESSED:1, COMPROMISED:2};
+
+let state = loadLocal() || {
+  topology: "segmented", base_time: 1700000000000, step_ms: 1000,
+  attackers: [{name: "APT-Alpha", entry_ip: "203.0.113.9", initial_access: "T1078",
+               prov: null, default_port: 22, color: PALETTE[0]}],
+  moves: [],
+};
+let currentAttacker = state.attackers[0] ? state.attackers[0].name : null;
+let topologyData = null;   // last /topology response
+let nodeIndex = {};        // nid -> {id,name,ip,has_ip,zone}, flattened from zones
+let pendingSrc = null;     // node id or "external", awaiting a second click
+let lastCompiledJsonl = null;
+// UI-only progression/attribution view state (never saved into the spec)
+let viewStep = null;       // show only the first N moves; null = all
+let focusAttacker = null;  // legend click isolates one attacker's moves
+let hoverMove = null;      // timeline-row hover -> emphasized move index
+let moveEls = [];          // per-move svg elements ({g, path, badge} or null)
+let playTimer = null;
+let sessionData = null;    // last /compile `sessions` (inferred S0..S3); null = stale/never
+let viewMode = 'attackers';// 'attackers' (authored) | 'sessions' (inferred overlay)
+let focusSession = null;   // isolate one session, keyed by stable `kind` (not the S-number)
+// UI-only preference (not part of the spec): technique auto-filled on new moves
+let defaultTech = localStorage.getItem(DEFAULT_TECH_KEY) || "T1021.004";
+const stage = document.getElementById('stage');
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.hidden = false;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (sessionData !== null) {             // any spec edit invalidates the compiled overlay
+    sessionData = null;                   // (guarded so repeated keystrokes stay cheap)
+    if (viewMode === 'sessions') { updateOverlay(); renderLegendDispatch(); }
+  }
+}
+
+function attackerByName(name) {
+  return state.attackers.find(a => a.name === name);
+}
+
+// ---------------------------------------------------------------- topology
+
+async function loadTopology(name) {
+  const res = await fetch(`/topology?name=${encodeURIComponent(name)}`);
+  topologyData = await res.json();
+  nodeIndex = {};
+  for (const z of topologyData.zones)
+    for (const n of z.nodes) nodeIndex[n.id] = {...n, zone: z.id};
+  renderDefaultTechOptions();
+  renderCanvas();
+  renderTechniqueOptions();
+  renderMoves();  // technique <select> options depend on topologyData
+  updateStepBar();
+}
+
+// group techniques by tactic (registry order) into <optgroup>s
+function techniqueGroupsHtml(selected) {
+  if (!topologyData) return `<option value="${selected}">${selected}</option>`;
+  const groups = {};
+  for (const [tid, t] of Object.entries(topologyData.techniques)) {
+    (groups[t.tactic] = groups[t.tactic] || []).push([tid, t]);
+  }
+  return Object.entries(groups).map(([tactic, items]) =>
+    `<optgroup label="${tactic}">` + items.map(([tid, t]) =>
+      `<option value="${tid}"${tid === selected ? ' selected' : ''}>${tid} — ${t.desc}</option>`
+    ).join('') + `</optgroup>`
+  ).join('');
+}
+
+function renderDefaultTechOptions() {
+  const sel = document.getElementById('defaultTech');
+  if (topologyData && !topologyData.techniques[defaultTech]) {
+    defaultTech = Object.keys(topologyData.techniques)[0] || defaultTech;
+  }
+  sel.innerHTML = techniqueGroupsHtml(defaultTech);
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function renderCanvas() {
+  stage.innerHTML = '';
+  stage.classList.toggle('picking-dst', !!pendingSrc);
+  if (!topologyData) return;
+
+  // SVG overlay first (absolute, behind interactive chips via pointer-events:none)
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.id = 'moveOverlay';
+  stage.appendChild(svg);
+
+  // external source box
+  const ext = document.createElement('div');
+  ext.id = 'external'; ext.textContent = 'EXTERNAL (internet)';
+  ext.onclick = () => onNodeClick('external', true);
+  ext.style.gridColumn = '1';
+  stage.appendChild(ext);
+
+  // one flex box per zone; nodes in a CSS grid inside
+  for (const z of topologyData.zones) {
+    const zoneEl = document.createElement('div');
+    zoneEl.className = 'zone';
+    zoneEl.dataset.zoneId = z.id;
+    zoneEl.style.background = z.fill;
+
+    // Logical grid placement
+    if (['marketing', 'it', 'hr_executive', 'corporate_it'].includes(z.id)) {
+      zoneEl.style.gridColumn = '1';
+    } else if (z.id === 'perimeter') {
+      zoneEl.style.gridColumn = '2';
+      zoneEl.style.gridRow = '1 / span 4';
+      zoneEl.style.alignSelf = 'center';
+    } else if (z.id === 'dmz_public') {
+      zoneEl.style.gridColumn = '3 / span 2';
+      zoneEl.style.gridRow = '1';
+      zoneEl.style.marginBottom = '40px';
+    } else if (['intranet_app', 'intranet_private', 'production'].includes(z.id)) {
+      zoneEl.style.gridColumn = '3';
+      zoneEl.style.gridRow = '2 / span 2';
+    } else if (['intranet_db', 'intranet_backup'].includes(z.id)) {
+      zoneEl.style.gridColumn = '4';
+      // Put them in rows 2 and 3 so they sit side-by-side with app
+      zoneEl.style.gridRow = z.id === 'intranet_db' ? '2' : '3';
+    }
+
+    const label = document.createElement('div');
+    label.className = 'zlabel'; label.textContent = z.title;
+    zoneEl.appendChild(label);
+
+    const nodesEl = document.createElement('div');
+    nodesEl.className = 'nodes';
+    // wrap to the zone's actual width instead of forcing fixed column counts,
+    // so nodes never overflow/clip outside their zone box
+    nodesEl.style.gridTemplateColumns = 'repeat(auto-fit, minmax(84px, 1fr))';
+
+    for (const nd of z.nodes) {
+      const n = document.createElement('div');
+      n.className = 'node' + (nd.has_ip ? '' : ' noip');
+      n.dataset.nodeId = nd.id;
+      const box = document.createElement('div');
+      box.className = 'nbox';
+      const nm = document.createElement('div');
+      nm.className = 'nm'; nm.textContent = nd.id;
+      const ip = document.createElement('div');
+      ip.className = 'ip'; ip.textContent = nd.ip || '(no ip)';
+      box.appendChild(nm); box.appendChild(ip);
+      n.appendChild(box);
+      n.onclick = () => onNodeClick(nd.id, nd.has_ip);
+      nodesEl.appendChild(n);
+    }
+    zoneEl.appendChild(nodesEl);
+    stage.appendChild(zoneEl);
+  }
+
+  redrawMoveLines();
+}
+
+function redrawMoveLines() {
+  const svg = document.getElementById('moveOverlay');
+  if (!svg) return;
+  svg.setAttribute('width', stage.scrollWidth);
+  svg.setAttribute('height', stage.scrollHeight);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  
+  const sr = stage.getBoundingClientRect();
+  const getRect = id => {
+      if (id === 'external') return document.getElementById('external').getBoundingClientRect();
+      const el = stage.querySelector(`.node[data-node-id="${CSS.escape(id)}"] .nbox`);
+      return el ? el.getBoundingClientRect() : null;
+  };
+  const getZone = id => {
+      if (id === 'external') return { col: 1, id: 'external', el: document.getElementById('external') };
+      const node = stage.querySelector(`.node[data-node-id="${CSS.escape(id)}"]`);
+      if (!node) return null;
+      const el = node.closest('.zone');
+      return { col: parseInt(el.style.gridColumn) || 1, id: el.dataset.zoneId, el };
+  };
+
+  // topology edges: a clean orthogonal backbone (context layer under moves)
+  drawTopologyBackbone(svg, sr, getRect, getZone);
+
+  // arrowhead markers, one per attacker color
+  if (focusAttacker && !attackerByName(focusAttacker)) focusAttacker = null;
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  for (const c of new Set(state.attackers.map(a => a.color))) {
+    const mk = document.createElementNS(SVG_NS, 'marker');
+    mk.setAttribute('id', 'arr-' + c.replace(/[^a-zA-Z0-9]/g, ''));
+    mk.setAttribute('viewBox', '0 0 10 10');
+    mk.setAttribute('refX', '8'); mk.setAttribute('refY', '5');
+    mk.setAttribute('markerWidth', '6.5'); mk.setAttribute('markerHeight', '6.5');
+    mk.setAttribute('orient', 'auto-start-reverse');
+    const tip = document.createElementNS(SVG_NS, 'path');
+    tip.setAttribute('d', 'M0,0 L10,5 L0,10 z');
+    tip.setAttribute('fill', c);
+    mk.appendChild(tip);
+    defs.appendChild(mk);
+  }
+  svg.appendChild(defs);
+
+  // moves: colored curved arrows with numbered badges (global timeline order)
+  const curveIdx = {};                     // undirected pair -> curves so far
+  moveEls = [];
+  const visible = visibleMoveCount();
+  state.moves.forEach((m, i) => {
+    moveEls[i] = null;
+    if (i >= visible) return;
+    const a = attackerByName(m.attacker);
+    if (!a) return;
+    const rS = getRect(m.src), rD = getRect(m.dst);
+    if (!rS || !rD) return;                // raw-IP / stale endpoint: not on canvas
+    const key = m.src < m.dst ? m.src + '|' + m.dst : m.dst + '|' + m.src;
+    const n = curveIdx[key] = (curveIdx[key] || 0) + 1;
+    const k = n === 1 ? 0 : (n % 2 === 0 ? n / 2 : -(n - 1) / 2);   // 0,1,-1,2,-2...
+    moveEls[i] = drawMoveCurve(svg, m, i, a, rS, rD, sr, k);
+  });
+  applyMoveEmphasis();
+  updateOverlay();
+  syncProgressUI();
+}
+
+// Orthogonal, Cisco/Visio-style backbone for the topology edges. The topology
+// is a star/tree rooted at the highest-degree node (the firewall). We draw it
+// with 90-degree segments routed through the column gutters:
+//   - department hosts collect onto ONE vertical trunk feeding the root's left;
+//   - the root fans out on the right, entering multi-host zones from a shared
+//     top bus and reaching far zones along a bottom channel;
+//   - intra-zone links are short horizontals between edge centers.
+// No node ids are hardcoded: the hub is max-degree, sides are by column.
+function drawTopologyBackbone(svg, sr, getRect, getZone) {
+  if (!topologyData || !topologyData.edges || !topologyData.edges.length) return;
+  const edges = topologyData.edges;
+
+  // stage-local rect (edge-center ports) for a node id
+  const R = id => {
+    const r = getRect(id);
+    return r ? {l: r.left - sr.left, r: r.right - sr.left, t: r.top - sr.top,
+                b: r.bottom - sr.top, cx: r.left - sr.left + r.width / 2,
+                cy: r.top - sr.top + r.height / 2} : null;
+  };
+  // stage-local bounding box of a node's ZONE (used for gutter/boundary math;
+  // derived from zone boxes so a col-spanning zone can't corrupt a channel)
+  const Z = id => {
+    const z = getZone(id);
+    if (!z) return null;
+    const b = z.el.getBoundingClientRect();
+    return {l: b.left - sr.left, r: b.right - sr.left, t: b.top - sr.top, b: b.bottom - sr.top};
+  };
+  const bottomChannel = Math.max(0, ...[...document.querySelectorAll('.zone')]
+      .map(el => el.getBoundingClientRect().bottom - sr.top)) + 24;
+
+  const seg = pts => {
+    const clean = pts.filter((p, i) => i === 0 || p.x !== pts[i - 1].x || p.y !== pts[i - 1].y);
+    if (clean.length < 2) return;
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', 'M ' + clean.map(p => `${p.x} ${p.y}`).join(' L '));
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', '#aab2bd');
+    p.setAttribute('stroke-width', 1.4);
+    p.setAttribute('stroke-linejoin', 'round');
+    p.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(p);
+  };
+
+  // hub = the node incident to the most edges
+  const deg = {};
+  edges.forEach(e => { deg[e.source] = (deg[e.source] || 0) + 1;
+                       deg[e.target] = (deg[e.target] || 0) + 1; });
+  let hub = null, best = -1;
+  for (const id in deg) if (deg[id] > best) { best = deg[id]; hub = id; }
+  const H = R(hub), hubZ = getZone(hub);
+  if (!H || !hubZ) return;
+  const hubCol = hubZ.col;
+
+  // classify edges: spokes touch the hub, peers don't
+  const spokeIds = [], peers = [];
+  edges.forEach(e => {
+    if (e.source === hub || e.target === hub) spokeIds.push(e.source === hub ? e.target : e.source);
+    else peers.push(e);
+  });
+
+  const left = [], nearR = [], farR = [];
+  spokeIds.forEach(id => {
+    const z = getZone(id), n = R(id);
+    if (!z || !n) return;
+    if (z.col < hubCol) left.push(id);
+    else if (z.col === hubCol + 1) nearR.push(id);
+    else farR.push(id);
+  });
+  // how many spokes land in each zone -> single spokes enter from the side,
+  // multi-spoke zones share a top distribution bus
+  const zoneSpokeCount = {};
+  spokeIds.forEach(id => { const z = getZone(id); if (z) zoneSpokeCount[z.id] = (zoneSpokeCount[z.id] || 0) + 1; });
+
+  // ---- LEFT: department comb into the hub's left edge --------------------
+  if (left.length) {
+    const busX = (Math.max(...left.map(id => R(id).r)) + H.l) / 2;  // gutter before the hub
+    const ys = left.map(id => R(id).cy).concat([H.cy]);
+    seg([{x: busX, y: Math.min(...ys)}, {x: busX, y: Math.max(...ys)}]);   // trunk
+    seg([{x: busX, y: H.cy}, {x: H.l, y: H.cy}]);                          // into hub
+    left.forEach(id => { const n = R(id); seg([{x: n.r, y: n.cy}, {x: busX, y: n.cy}]); });
+  }
+
+  // ---- RIGHT: hub fans out to the server zones --------------------------
+  const rightIds = [...nearR, ...farR];
+  if (rightIds.length) {
+    const busX = (H.r + Math.min(...rightIds.map(id => Z(id).l))) / 2;  // gutter after the hub
+    const rys = nearR.map(id => R(id).cy)
+        .concat(nearR.map(id => Z(id).t - 12)).concat([H.cy]);
+    if (farR.length) rys.push(bottomChannel);
+    seg([{x: busX, y: Math.min(...rys)}, {x: busX, y: Math.max(...rys)}]);  // dist bus
+    seg([{x: H.r, y: H.cy}, {x: busX, y: H.cy}]);                           // out of hub
+
+    nearR.forEach(id => {
+      const n = R(id), z = getZone(id);
+      if (zoneSpokeCount[z.id] > 1) {                 // enter a multi-host zone from a top bus
+        const by = Z(id).t - 12;
+        seg([{x: busX, y: by}, {x: n.cx, y: by}, {x: n.cx, y: n.t}]);
+      } else {                                        // single host: straight into the left edge
+        seg([{x: busX, y: n.cy}, {x: n.l, y: n.cy}]);
+      }
+    });
+
+    // far zones (2+ columns away): down the bus, along the bottom channel, then
+    // up just outside the zone's left boundary -- never across a zone box.
+    farR.forEach(id => {
+      const n = R(id), fx = Z(id).l - 14;
+      seg([{x: busX, y: bottomChannel}, {x: fx, y: bottomChannel},
+           {x: fx, y: n.cy}, {x: n.l, y: n.cy}]);
+    });
+  }
+
+  // ---- PEER links (neither endpoint is the hub) -------------------------
+  peers.forEach(e => {
+    const a = R(e.source), b = R(e.target), za = getZone(e.source), zb = getZone(e.target);
+    if (!a || !b || !za || !zb) return;
+    if (za.id === zb.id) {                            // same zone: link along the closer axis
+      const dx = Math.abs(a.cx - b.cx), dy = Math.abs(a.cy - b.cy);
+      if (dx >= dy) {                                 // side-by-side -> horizontal
+        const l = a.cx <= b.cx ? a : b, r = a.cx <= b.cx ? b : a;
+        if (dy < 4) seg([{x: l.r, y: l.cy}, {x: r.l, y: r.cy}]);
+        else { const mx = (l.r + r.l) / 2;
+          seg([{x: l.r, y: l.cy}, {x: mx, y: l.cy}, {x: mx, y: r.cy}, {x: r.l, y: r.cy}]); }
+      } else {                                        // stacked -> vertical
+        const t = a.cy <= b.cy ? a : b, bt = a.cy <= b.cy ? b : a;
+        if (dx < 4) seg([{x: t.cx, y: t.b}, {x: bt.cx, y: bt.t}]);
+        else { const my = (t.b + bt.t) / 2;
+          seg([{x: t.cx, y: t.b}, {x: t.cx, y: my}, {x: bt.cx, y: my}, {x: bt.cx, y: bt.t}]); }
+      }
+    } else {                                          // different zones: one bend via the gutter
+      const lId = za.col <= zb.col ? e.source : e.target;
+      const rId = za.col <= zb.col ? e.target : e.source;
+      const l = R(lId), r = R(rId);
+      const gx = (Z(lId).r + Z(rId).l) / 2;
+      seg([{x: l.r, y: l.cy}, {x: gx, y: l.cy}, {x: gx, y: r.cy}, {x: r.l, y: r.cy}]);
+    }
+  });
+}
+
+function drawMoveCurve(svg, m, i, a, rS, rD, sr, k) {
+  const g = document.createElementNS(SVG_NS, 'g');
+  const x0 = rS.left - sr.left + rS.width / 2, y0 = rS.top - sr.top + rS.height / 2;
+  const x1 = rD.left - sr.left + rD.width / 2, y1 = rD.top - sr.top + rD.height / 2;
+  let d, bx, by;                            // path + badge anchor
+  if (m.src === m.dst) {                    // hand-edited self-loop
+    const tx = x0 + rS.width / 4, ty = y0 - rS.height / 2;
+    d = `M ${tx - 9} ${ty} a 13 13 0 1 1 18 -3`;
+    bx = tx; by = ty - 26;
+  } else {
+    const dx = x1 - x0, dy = y1 - y0, dist = Math.hypot(dx, dy) || 1;
+    const nx = -dy / dist, ny = dx / dist;  // unit normal to the chord
+    const bow = (14 + Math.min(dist * 0.12, 46) + Math.abs(k) * 16)
+                * (k === 0 ? 1 : Math.sign(k));
+    const mx = (x0 + x1) / 2 + nx * bow, my = (y0 + y1) / 2 + ny * bow;
+    // trim both ends to the chip border so the arrowhead lands on the box edge
+    const trim = (rect, px, py, qx, qy) => {
+      const ddx = qx - px, ddy = qy - py, len = Math.hypot(ddx, ddy) || 1;
+      const ux = ddx / len, uy = ddy / len;
+      const ex = Math.abs(ux) < 1e-6 ? 1e9 : (rect.width / 2 + 3) / Math.abs(ux);
+      const ey = Math.abs(uy) < 1e-6 ? 1e9 : (rect.height / 2 + 3) / Math.abs(uy);
+      const t = Math.min(ex, ey, len * 0.45);
+      return {x: px + ux * t, y: py + uy * t};
+    };
+    const p0 = trim(rS, x0, y0, mx, my);
+    const p1 = trim(rD, x1, y1, mx, my);
+    d = `M ${p0.x} ${p0.y} Q ${mx} ${my} ${p1.x} ${p1.y}`;
+    bx = 0.25 * p0.x + 0.5 * mx + 0.25 * p1.x;   // quadratic point at t=0.5
+    by = 0.25 * p0.y + 0.5 * my + 0.25 * p1.y;
+  }
+
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke', a.color);
+  path.setAttribute('stroke-width', 2.2);
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('marker-end', `url(#arr-${a.color.replace(/[^a-zA-Z0-9]/g, '')})`);
+  g.appendChild(path);
+
+  const badge = document.createElementNS(SVG_NS, 'g');
+  badge.setAttribute('class', 'mv-badge');
+  const circ = document.createElementNS(SVG_NS, 'circle');
+  circ.setAttribute('cx', bx); circ.setAttribute('cy', by); circ.setAttribute('r', 8);
+  circ.setAttribute('fill', '#fff');
+  circ.setAttribute('stroke', a.color); circ.setAttribute('stroke-width', 1.6);
+  const num = document.createElementNS(SVG_NS, 'text');
+  num.setAttribute('x', bx); num.setAttribute('y', by);
+  num.setAttribute('fill', a.color);
+  num.textContent = i + 1;
+  const tip = document.createElementNS(SVG_NS, 'title');
+  tip.textContent = `#${i + 1} ${m.attacker}: ${m.src} → ${m.dst} (${m.technique})`;
+  badge.appendChild(tip); badge.appendChild(circ); badge.appendChild(num);
+  badge.onclick = () => flashTimelineRow(i);
+  g.appendChild(badge);
+
+  svg.appendChild(g);
+  return {g, path, badge};
+}
+
+function visibleMoveCount() {
+  return viewStep === null ? state.moves.length
+                           : Math.min(viewStep, state.moves.length);
+}
+
+// opacity/width per move from the scrub position, legend focus, and row hover
+function applyMoveEmphasis() {
+  const visible = visibleMoveCount();
+  const scrubbing = viewStep !== null && viewStep < state.moves.length;
+  state.moves.forEach((m, i) => {
+    const el = moveEls[i];
+    if (!el) return;
+    let op = 0.9, w = 2.2;
+    if (viewMode === 'sessions') {
+      op = 0.12;                          // authored arrows recede to faint context
+    } else {
+      if (focusAttacker && m.attacker !== focusAttacker) op = 0.08;
+      if (hoverMove !== null) {
+        if (i === hoverMove) { op = 1; w = 3.6; } else op = Math.min(op, 0.15);
+      }
+    }
+    el.path.classList.toggle('cur-move',
+        viewMode === 'attackers' && scrubbing && i === visible - 1 && hoverMove === null);
+    el.path.setAttribute('opacity', op);
+    el.path.setAttribute('stroke-width', w);
+    el.badge.setAttribute('opacity', op < 0.5 ? 0.15 : 1);
+  });
+}
+
+// per-node attacker dots: which attackers have touched this host so far
+function updateNodeMarks() {
+  stage.querySelectorAll('.node .marks').forEach(el => el.remove());
+  const touched = {};                       // node id -> Set of attacker names
+  state.moves.slice(0, visibleMoveCount()).forEach(m => {
+    if (!attackerByName(m.attacker)) return;
+    if (focusAttacker && m.attacker !== focusAttacker) return;
+    for (const nid of [m.dst, m.src]) {
+      if (nid === 'external' || !nodeIndex[nid]) continue;
+      (touched[nid] = touched[nid] || new Set()).add(m.attacker);
+    }
+  });
+  for (const [nid, names] of Object.entries(touched)) {
+    const nodeEl = stage.querySelector(`.node[data-node-id="${CSS.escape(nid)}"]`);
+    if (!nodeEl) continue;
+    const marks = document.createElement('div');
+    marks.className = 'marks';
+    for (const nm of names) {
+      const a = attackerByName(nm);
+      if (!a) continue;
+      const dot = document.createElement('span');
+      dot.className = 'dot'; dot.style.background = a.color; dot.title = nm;
+      marks.appendChild(dot);
+    }
+    nodeEl.appendChild(marks);
+  }
+}
+
+// dispatch the per-node overlay by view mode; always clears both layers first
+function updateOverlay() {
+  stage.querySelectorAll('.nbox').forEach(b =>
+    b.classList.remove('sess-CLEAN', 'sess-ACCESSED', 'sess-COMPROMISED'));
+  if (viewMode === 'sessions') updateSessionMarks();
+  else updateNodeMarks();
+}
+
+// inferred-session dots: one numbered dot per session touching a node, colored by
+// that session's compromise state; the node border shows the worst-case state.
+// This is the ENGINE's reconstruction (S0..S3), keyed by node ids from /compile.
+function updateSessionMarks() {
+  stage.querySelectorAll('.node .marks').forEach(el => el.remove());
+  if (!sessionData) return;                 // nothing compiled yet -> legend shows the hint
+  const worst = {};                         // node id -> worst-ranked status seen
+  sessionData.forEach(s => {
+    if (focusSession && s.kind !== focusSession) return;
+    for (const [nid, status] of Object.entries(s.nodes)) {
+      if (!nodeIndex[nid]) continue;         // external actor_ips aren't canvas nodes
+      const nodeEl = stage.querySelector(`.node[data-node-id="${CSS.escape(nid)}"]`);
+      if (!nodeEl) continue;
+      let marks = nodeEl.querySelector('.marks');
+      if (!marks) { marks = document.createElement('div'); marks.className = 'marks';
+                    nodeEl.appendChild(marks); }
+      const dot = document.createElement('span');
+      dot.className = 'dot sdot';
+      dot.style.background = STATE_COLOR[status] || '#888';
+      dot.textContent = s.name.replace(/^S/, '');
+      dot.title = `${s.name} · ${s.kind}: ${status}`;
+      marks.appendChild(dot);
+      if (!(nid in worst) || STATE_RANK[status] > STATE_RANK[worst[nid]]) worst[nid] = status;
+    }
+  });
+  for (const [nid, status] of Object.entries(worst)) {
+    const box = stage.querySelector(`.node[data-node-id="${CSS.escape(nid)}"] .nbox`);
+    if (box) box.classList.add('sess-' + status);
+  }
+}
+
+function syncProgressUI() {
+  const slider = document.getElementById('stepSlider');
+  slider.max = state.moves.length;
+  slider.value = visibleMoveCount();
+  document.getElementById('stepCount').textContent =
+      `${visibleMoveCount()} / ${state.moves.length}`;
+  document.getElementById('playBtn').textContent = playTimer ? '⏸' : '▶';
+  renderLegendDispatch();
+}
+
+function renderLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  state.attackers.forEach(a => {
+    const chip = document.createElement('span');
+    chip.className = 'legend-chip'
+        + (focusAttacker === a.name ? ' focused' : '')
+        + (focusAttacker && focusAttacker !== a.name ? ' dimmed' : '');
+    chip.title = "click to isolate this attacker's moves";
+    const sw = document.createElement('span');
+    sw.className = 'swatch'; sw.style.background = a.color;
+    chip.appendChild(sw);
+    chip.appendChild(document.createTextNode(a.name));
+    chip.onclick = () => {
+      focusAttacker = focusAttacker === a.name ? null : a.name;
+      redrawMoveLines();
+    };
+    el.appendChild(chip);
+  });
+}
+
+function renderLegendDispatch() {
+  if (viewMode === 'sessions') renderSessionLegend();
+  else renderLegend();
+}
+
+// short chip label from the stable session `kind` string
+function sessionShortLabel(kind) {
+  return kind.replace('objective campaign -> ', '→ ')
+             .replace('foothold ingress from ', 'ingress ');
+}
+
+// legend for the inferred-session overlay: one chip per S0..S3 (or a "compile
+// first" hint). Clicking isolates a session by its stable `kind`.
+function renderSessionLegend() {
+  const el = document.getElementById('legend');
+  el.innerHTML = '';
+  if (!sessionData) {
+    const hint = document.createElement('span');
+    hint.className = 'legend-chip'; hint.style.cursor = 'default'; hint.style.opacity = '.7';
+    hint.textContent = 'Compile to see inferred sessions';
+    el.appendChild(hint);
+    return;
+  }
+  sessionData.forEach(s => {
+    const chip = document.createElement('span');
+    chip.className = 'legend-chip'
+        + (focusSession === s.kind ? ' focused' : '')
+        + (focusSession && focusSession !== s.kind ? ' dimmed' : '');
+    const gt = s.eval_ground_truth || {};
+    chip.title = s.kind
+        + (gt.majority ? ` — matches ${gt.majority} (purity ${gt.purity}, eval-only)` : '');
+    const sw = document.createElement('span');
+    sw.className = 'swatch'; sw.style.background = '#8a94a6';
+    chip.appendChild(sw);
+    chip.appendChild(document.createTextNode(`${s.name} · ${sessionShortLabel(s.kind)}`));
+    chip.onclick = () => {
+      focusSession = focusSession === s.kind ? null : s.kind;
+      redrawMoveLines();
+    };
+    el.appendChild(chip);
+  });
+}
+
+// view toggle: flip the whole canvas between authored attackers and inferred sessions
+function setViewMode(mode) {
+  if (viewMode === mode) return;
+  viewMode = mode;
+  focusSession = null;
+  document.getElementById('viewAuthored').classList.toggle('active', mode === 'attackers');
+  document.getElementById('viewSessions').classList.toggle('active', mode === 'sessions');
+  if (mode === 'sessions' && !sessionData)
+    toast('Compile & validate to populate the inferred sessions (S0…S3).');
+  redrawMoveLines();
+}
+document.getElementById('viewAuthored').onclick = () => setViewMode('attackers');
+document.getElementById('viewSessions').onclick = () => setViewMode('sessions');
+
+function flashTimelineRow(i) {
+  const tr = document.querySelector(`#movesTable tbody tr[data-index="${i}"]`);
+  if (!tr) return;
+  tr.classList.remove('flash');
+  void tr.offsetWidth;                     // restart the animation
+  tr.classList.add('flash');
+  tr.scrollIntoView({block: 'nearest'});
+}
+
+function stopPlayback() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  document.getElementById('playBtn').textContent = '▶';
+}
+
+// derived status/step bar above the canvas
+function updateStepBar() {
+  const bar = document.getElementById('stepBar');
+  const swatch = document.getElementById('stepSwatch');
+  const who = document.getElementById('stepAttacker');
+  const msg = document.getElementById('stepMsg');
+  const a = currentAttacker ? attackerByName(currentAttacker) : null;
+  if (!currentAttacker || !a) {
+    bar.classList.add('warn');
+    swatch.style.display = 'none'; who.textContent = '';
+    msg.textContent = 'Add an attacker in the roster to start building moves.';
+    return;
+  }
+  bar.classList.remove('warn');
+  swatch.style.display = ''; swatch.style.background = a.color;
+  who.textContent = a.name;
+  if (pendingSrc) {
+    msg.innerHTML = `— source <b>${pendingSrc}</b> selected. Now click a DESTINATION node — Esc cancels.`;
+  } else {
+    msg.textContent = '— click a SOURCE node (or the EXTERNAL box) to start a move.';
+  }
+}
+
+function onNodeClick(nid, hasIp) {
+  if (!hasIp) {
+    toast(nid + ' has no pinned IP — cannot be a move endpoint (compiler constraint); '
+          + 'edit that move\'s src/dst by hand in the timeline instead.');
+    return;
+  }
+  if (!currentAttacker) { toast('Add and select an attacker first.'); return; }
+  if (pendingSrc === null) {              // first click: source
+    pendingSrc = nid;
+    afterPendingChange();
+    return;
+  }
+  if (pendingSrc === nid) {               // clicked the same node twice -> cancel
+    pendingSrc = null;
+    afterPendingChange();
+    return;
+  }
+  const attacker = attackerByName(currentAttacker);
+  const isFoothold = pendingSrc === 'external';
+  const tech = isFoothold ? attacker.initial_access : defaultTech;
+  state.moves.push({
+    attacker: currentAttacker, src: pendingSrc, dst: nid,
+    technique: tech, port: null, t: null, kind: isFoothold ? 'foothold' : null,
+  });
+  const src = pendingSrc;
+  pendingSrc = null;
+  stopPlayback();
+  viewStep = null;                          // adding a move shows the full picture
+  saveLocal();
+  afterPendingChange();
+  renderMoves(state.moves.length - 1);   // flash + scroll the new row
+  redrawMoveLines();                     // draw the new move's line
+  toast(`Move ${state.moves.length}: ${src} → ${nid} (${tech}) — change the technique in the timeline →`);
+}
+
+// keep selection glow, cursor mode, and step bar in sync with pendingSrc
+function afterPendingChange() {
+  highlightSelection();
+  stage.classList.toggle('picking-dst', !!pendingSrc);
+  updateStepBar();
+}
+
+function cancelPending() {
+  if (!pendingSrc) return;
+  pendingSrc = null;
+  afterPendingChange();
+}
+
+function highlightSelection() {
+  stage.querySelectorAll('.node.selected').forEach(el => el.classList.remove('selected'));
+  const ext = document.getElementById('external');
+  if (ext) ext.classList.remove('selected');
+  if (pendingSrc === 'external') {
+    if (ext) ext.classList.add('selected');
+  } else if (pendingSrc) {
+    const el = stage.querySelector(`.node[data-node-id="${CSS.escape(pendingSrc)}"]`);
+    if (el) el.classList.add('selected');
+  }
+}
+
+// ---------------------------------------------------------------- roster
+
+function nextColor() {
+  return PALETTE[state.attackers.length % PALETTE.length];
+}
+
+function renderRoster() {
+  const tbody = document.querySelector('#rosterTable tbody');
+  tbody.innerHTML = '';
+  state.attackers.forEach((a, i) => {
+    const tr = document.createElement('tr');
+    if (a.name === currentAttacker) tr.classList.add('current-attacker');
+    tr.onclick = (ev) => {
+      if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'BUTTON') return;
+      currentAttacker = a.name;
+      renderRoster();
+      updateStepBar();
+    };
+
+    const swatchTd = document.createElement('td');
+    const sw = document.createElement('span');
+    sw.className = 'swatch'; sw.style.background = a.color;
+    swatchTd.appendChild(sw);
+    tr.appendChild(swatchTd);
+
+    const field = (key, placeholder) => {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.value = a[key] || ''; inp.placeholder = placeholder || '';
+      inp.oninput = () => {
+        const old = a.name;
+        a[key] = inp.value;
+        if (key === 'name' && currentAttacker === old) currentAttacker = inp.value;
+        state.moves.forEach(m => { if (m.attacker === old) m.attacker = a.name; });
+        saveLocal();
+        if (key === 'name') { renderRoster(); renderMoves(); redrawMoveLines(); updateStepBar(); }
+      };
+      td.appendChild(inp);
+      return td;
+    };
+    tr.appendChild(field('name'));
+    tr.appendChild(field('entry_ip'));
+    tr.appendChild(field('initial_access'));
+    tr.appendChild(field('prov', '(none)'));
+
+    const portTd = document.createElement('td');
+    const portInp = document.createElement('input');
+    portInp.type = 'number'; portInp.value = a.default_port;
+    portInp.oninput = () => { a.default_port = parseInt(portInp.value, 10) || 22; saveLocal(); };
+    portTd.appendChild(portInp);
+    tr.appendChild(portTd);
+
+    const delTd = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'row-btn'; delBtn.textContent = '✕';
+    delBtn.onclick = () => {
+      state.attackers.splice(i, 1);
+      state.moves = state.moves.filter(m => m.attacker !== a.name);
+      if (currentAttacker === a.name) {
+        currentAttacker = state.attackers[0] ? state.attackers[0].name : null;
+      }
+      saveLocal(); renderRoster(); renderMoves(); redrawMoveLines(); updateStepBar();
+    };
+    delTd.appendChild(delBtn);
+    tr.appendChild(delTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('addAttackerBtn').onclick = () => {
+  const n = state.attackers.length + 1;
+  const a = {name: `Attacker-${n}`, entry_ip: '203.0.113.' + (10 + n),
+             initial_access: 'T1078', prov: null, default_port: 22, color: nextColor()};
+  state.attackers.push(a);
+  currentAttacker = a.name;
+  saveLocal(); renderRoster(); updateStepBar();
+};
+
+// ---------------------------------------------------------------- moves
+
+function techniqueOptionsHtml(selected) {
+  if (!topologyData) return `<option value="${selected}">${selected}</option>`;
+  return Object.entries(topologyData.techniques).map(([tid, t]) =>
+    `<option value="${tid}"${tid === selected ? ' selected' : ''}>${tid} — ${t.desc}</option>`
+  ).join('');
+}
+
+function renderTechniqueOptions() {
+  document.querySelectorAll('.tech-select').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = techniqueOptionsHtml(cur);
+  });
+}
+
+function renderMoves(flashIndex) {
+  const tbody = document.querySelector('#movesTable tbody');
+  tbody.innerHTML = '';
+  state.moves.forEach((m, i) => {
+    const tr = document.createElement('tr');
+    tr.draggable = true;
+    tr.dataset.index = i;
+    if (i === flashIndex) {
+      tr.classList.add('flash');
+      requestAnimationFrame(() => tr.scrollIntoView({block: 'nearest'}));
+    }
+    tr.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', i); tr.classList.add('dragging'); };
+    tr.ondragend = () => tr.classList.remove('dragging');
+    tr.ondragover = (ev) => ev.preventDefault();
+    tr.ondrop = (ev) => {
+      ev.preventDefault();
+      const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
+      const to = i;
+      if (from === to) return;
+      const [moved] = state.moves.splice(from, 1);
+      state.moves.splice(to, 0, moved);
+      saveLocal(); renderMoves(); redrawMoveLines();
+    };
+
+    tr.onmouseenter = () => { hoverMove = i; applyMoveEmphasis(); };
+    tr.onmouseleave = () => { hoverMove = null; applyMoveEmphasis(); };
+
+    const handleTd = document.createElement('td');
+    handleTd.className = 'drag-handle'; handleTd.textContent = '⠿';
+    tr.appendChild(handleTd);
+
+    const numTd = document.createElement('td');
+    numTd.textContent = i + 1;
+    numTd.style.color = '#888';
+    tr.appendChild(numTd);
+
+    const attackerTd = document.createElement('td');
+    const a = attackerByName(m.attacker);
+    attackerTd.innerHTML = `<span class="swatch" style="background:${a ? a.color : '#999'}"></span> ${m.attacker}`;
+    tr.appendChild(attackerTd);
+
+    const textField = (key) => {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.value = m[key] || '';
+      inp.oninput = () => { m[key] = inp.value; saveLocal(); redrawMoveLines(); };
+      td.appendChild(inp);
+      return td;
+    };
+    tr.appendChild(textField('src'));
+    tr.appendChild(textField('dst'));
+
+    const techTd = document.createElement('td');
+    const techSel = document.createElement('select');
+    techSel.className = 'tech-select';
+    techSel.innerHTML = techniqueOptionsHtml(m.technique);
+    techSel.onchange = () => { m.technique = techSel.value; saveLocal(); };
+    techTd.appendChild(techSel);
+    tr.appendChild(techTd);
+
+    const portTd = document.createElement('td');
+    const portInp = document.createElement('input');
+    portInp.type = 'number'; portInp.value = m.port == null ? '' : m.port;
+    portInp.placeholder = '(default)';
+    portInp.oninput = () => { m.port = portInp.value === '' ? null : parseInt(portInp.value, 10); saveLocal(); };
+    portTd.appendChild(portInp);
+    tr.appendChild(portTd);
+
+    const tTd = document.createElement('td');
+    const tInp = document.createElement('input');
+    tInp.type = 'number'; tInp.value = m.t == null ? '' : m.t;
+    tInp.placeholder = '(auto)';
+    tInp.oninput = () => { m.t = tInp.value === '' ? null : parseInt(tInp.value, 10); saveLocal(); };
+    tTd.appendChild(tInp);
+    tr.appendChild(tTd);
+
+    const delTd = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'row-btn'; delBtn.textContent = '✕';
+    delBtn.onclick = () => { state.moves.splice(i, 1); saveLocal(); renderMoves(); redrawMoveLines(); };
+    delTd.appendChild(delBtn);
+    tr.appendChild(delTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------- compile
+
+document.getElementById('compileBtn').onclick = async () => {
+  const report = document.getElementById('report');
+  report.textContent = 'compiling...'; report.classList.remove('err');
+  try {
+    const res = await fetch('/compile', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(state),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      report.textContent = 'ERROR: ' + data.error;
+      report.classList.add('err');
+      lastCompiledJsonl = null;
+      document.getElementById('downloadBtn').disabled = true;
+      return;
+    }
+    report.textContent = data.report;
+    lastCompiledJsonl = data.jsonl;
+    document.getElementById('downloadBtn').disabled = false;
+    sessionData = (data.sessions && data.sessions.length) ? data.sessions : null;
+    if (viewMode === 'sessions') redrawMoveLines();   // refresh the overlay with fresh sessions
+    else toast(`Compiled. ${sessionData ? sessionData.length : 0} inferred session(s) — `
+               + `switch to "Inferred sessions" to see them.`);
+  } catch (e) {
+    report.textContent = 'ERROR: ' + e;
+    report.classList.add('err');
+  }
+};
+
+function downloadBlob(text, filename, type) {
+  const blob = new Blob([text], {type});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+document.getElementById('downloadBtn').onclick = () => {
+  if (lastCompiledJsonl) downloadBlob(lastCompiledJsonl, 'synthetic_alerts.jsonl', 'application/jsonl');
+};
+document.getElementById('saveSpecBtn').onclick = () => {
+  downloadBlob(JSON.stringify(state, null, 2), 'scenario.json', 'application/json');
+};
+document.getElementById('loadSpecBtn').onclick = () => {
+  document.getElementById('loadSpecFile').click();
+};
+// Adopt a freshly loaded/imported spec as the editor state and re-render.
+function applyLoadedSpec(newState) {
+  state = newState;
+  state.attackers.forEach((a, i) => { if (!a.color) a.color = PALETTE[i % PALETTE.length]; });
+  currentAttacker = state.attackers[0] ? state.attackers[0].name : null;
+  stopPlayback();
+  viewStep = null; focusAttacker = null; hoverMove = null;
+  viewMode = 'attackers'; focusSession = null; sessionData = null;
+  document.getElementById('viewAuthored').classList.add('active');
+  document.getElementById('viewSessions').classList.remove('active');
+  saveLocal();
+  document.getElementById('topologySelect').value = state.topology;
+  document.getElementById('baseTime').value = state.base_time;
+  document.getElementById('stepMs').value = state.step_ms;
+  loadTopology(state.topology);           // re-renders canvas + roster's dependents
+  renderRoster();
+}
+
+document.getElementById('loadSpecFile').onchange = (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { applyLoadedSpec(JSON.parse(reader.result)); }
+    catch (e) { toast('Could not load spec: ' + e); }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';                   // allow re-loading the same file
+};
+
+// Import: POST an existing synthetic_alerts.jsonl to /import, which reverses it
+// into a spec (the inverse of compile). The editor never parses OCSF itself.
+document.getElementById('importAlertsBtn').onclick = () => {
+  document.getElementById('importAlertsFile').click();
+};
+document.getElementById('importAlertsFile').onchange = (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const report = document.getElementById('report');
+  const reader = new FileReader();
+  reader.onload = async () => {
+    report.textContent = 'importing alerts...'; report.classList.remove('err');
+    try {
+      const res = await fetch('/import', {
+        method: 'POST', headers: {'Content-Type': 'application/x-ndjson'},
+        body: reader.result,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        report.textContent = 'IMPORT ERROR: ' + data.error;
+        report.classList.add('err');
+        toast('Import failed — see the validation report.');
+        return;
+      }
+      applyLoadedSpec(data.spec);
+      report.textContent = 'IMPORTED (not compiled yet):\n' + data.report
+          + '\n\nReview the timeline, then Compile & validate.';
+      toast(`Imported ${data.spec.moves.length} move(s), `
+            + `${data.spec.attackers.length} attacker(s).`);
+    } catch (e) {
+      report.textContent = 'IMPORT ERROR: ' + e; report.classList.add('err');
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';                   // allow re-importing the same file
+};
+
+document.getElementById('topologySelect').onchange = (ev) => {
+  state.topology = ev.target.value;
+  pendingSrc = null;
+  saveLocal();
+  loadTopology(state.topology);
+};
+document.getElementById('baseTime').oninput = (ev) => {
+  state.base_time = parseInt(ev.target.value, 10) || 0; saveLocal();
+};
+document.getElementById('stepMs').oninput = (ev) => {
+  state.step_ms = parseInt(ev.target.value, 10) || 1000; saveLocal();
+};
+document.getElementById('defaultTech').onchange = (ev) => {
+  defaultTech = ev.target.value;
+  localStorage.setItem(DEFAULT_TECH_KEY, defaultTech);
+};
+
+// progression scrubber: show only the first N moves; ▶ replays them in order
+document.getElementById('stepSlider').oninput = (ev) => {
+  stopPlayback();
+  const v = parseInt(ev.target.value, 10) || 0;
+  viewStep = v >= state.moves.length ? null : v;
+  redrawMoveLines();
+};
+document.getElementById('playBtn').onclick = () => {
+  if (playTimer) { stopPlayback(); return; }
+  if (!state.moves.length) { toast('No moves to replay yet.'); return; }
+  if (viewStep === null || viewStep >= state.moves.length) viewStep = 0;
+  playTimer = setInterval(() => {
+    viewStep += 1;
+    if (viewStep >= state.moves.length) { viewStep = null; stopPlayback(); }
+    redrawMoveLines();
+  }, 800);
+  redrawMoveLines();
+};
+
+// cancel a pending source: Esc, or a click on empty canvas / zone background
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') cancelPending();
+});
+stage.addEventListener('click', (ev) => {
+  const t = ev.target;
+  if (t === stage || t.classList.contains('zone') || t.classList.contains('zlabel')
+      || t.classList.contains('nodes')) {
+    cancelPending();
+  }
+});
+
+// keep move lines glued to their chips when the layout reflows
+window.addEventListener('resize', redrawMoveLines);
+new ResizeObserver(redrawMoveLines).observe(stage);
+
+// ---------------------------------------------------------------- init
+
+document.getElementById('topologySelect').value = state.topology;
+document.getElementById('baseTime').value = state.base_time;
+document.getElementById('stepMs').value = state.step_ms;
+renderRoster();
+updateStepBar();
+loadTopology(state.topology);
+</script>
+</body>
+</html>

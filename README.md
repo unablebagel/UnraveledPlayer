@@ -1,0 +1,74 @@
+---
+title: Attack Scenario Builder
+emoji: 🛰️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# Attack Scenario Builder
+
+Interactive authoring tool for synthetic multi-attacker scenarios: draw an
+attacker's move progression over a network topology in the browser, compile it
+to OCSF-style `synthetic_alerts.jsonl`, and see the inferred attacker sessions
+(S0..S3) overlaid back onto the editor — or import an existing alerts JSONL
+and reverse it into an editable scenario.
+
+This repo is a **standalone deployment snapshot** of the `scenario_builder`
+tool from the `tm-unraveled` research codebase, packaged for a Hugging Face
+Docker Space. The UI is a single `editor.html`; the backend is a stateless
+stdlib-only `http.server` (the scenario spec lives in the browser's
+localStorage). There are **no third-party Python dependencies**.
+
+## Endpoints
+
+| Route | What it does |
+| --- | --- |
+| `GET /` or `/editor.html` | the editor UI |
+| `GET /topology?name=segmented\|unraveled\|toy` | zones, nodes, edges, technique catalog |
+| `POST /compile` | scenario spec JSON → `{report, jsonl, alert_count, sessions}` |
+| `POST /import[?topology=...]` | alerts JSONL → editor spec (reverse compile) |
+
+## Run locally
+
+```bash
+python -m pipeline.scenario_builder.serve --host localhost --port 8765
+# then open http://localhost:8765/editor.html
+```
+
+Or with Docker:
+
+```bash
+docker build -t scenario-builder .
+docker run -p 7860:7860 scenario-builder
+```
+
+## Layout
+
+- `pipeline/` — vendored subset of the upstream `log_to_diagram_demo`
+  package, same layout so relative imports run unchanged. Three files are
+  owned here and intentionally differ from upstream: `pipeline/__init__.py`
+  (trimmed), `pipeline/evidence_extractor.py` (trimmed to drop the pandas
+  dependency), and `pipeline/scenario_builder/serve.py` (binds `0.0.0.0` and
+  reads `$PORT`). Everything else is a verbatim copy — fix bugs upstream,
+  then re-run `python sync_from_source.py` (only works from inside the
+  original research repo).
+- `pipeline/scenario_builder/examples/` — example scenario specs to try in
+  the editor or feed to `/compile`.
+
+## Tests
+
+```bash
+python -m pipeline.scenario_builder.test_compile
+python -m pipeline.scenario_builder.test_import
+```
+
+## Caveats
+
+- No auth: anyone with the Space URL can hit `/compile` with arbitrary spec
+  JSON. The compiler is bounded and the server holds no state, so the blast
+  radius is CPU only — but don't put anything sensitive behind it.
+- Free Spaces sleep after ~48 h without traffic; the first visit after that
+  wakes the container (takes a few seconds).

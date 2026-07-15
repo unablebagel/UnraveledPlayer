@@ -1,0 +1,21 @@
+{
+  "topology": "unraveled",
+  "base_time": 1700000000000,
+  "step_ms": 1000,
+  "attackers": [
+    {"name": "Operator P", "entry_ip": "10.1.1.18", "prov": "ses=1142@10.1.1.18",
+     "default_port": 22},
+    {"name": "Operator Q", "entry_ip": "10.1.3.14", "prov": "ses=2207@10.1.3.14",
+     "default_port": 22}
+  ],
+  "moves": [
+    {"attacker": "Operator P", "src": "it_host_1", "dst": "it_host_4",
+     "technique": "T1021.004", "port": 22, "t": 1700000000000},
+    {"attacker": "Operator Q", "src": "it_host_1", "dst": "mkt_host_4",
+     "technique": "T1021.004", "port": 22, "t": 1700000001000},
+    {"attacker": "Operator P", "src": "it_host_1", "dst": "database_system",
+     "technique": "T1021.004", "port": 22, "t": 1700000002000},
+    {"attacker": "Operator Q", "src": "it_host_1", "dst": "hr_host_3",
+     "technique": "T1021.004", "port": 22, "t": 1700000003000}
+  ]
+}

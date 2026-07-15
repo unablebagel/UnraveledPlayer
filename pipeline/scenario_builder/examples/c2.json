@@ -1,0 +1,26 @@
+{
+  "topology": "unraveled",
+  "base_time": 1700000000000,
+  "step_ms": 1000,
+  "attackers": [
+    {"name": "Advanced Persistent Threat", "entry_ip": "203.0.113.7",
+     "initial_access": "T1078", "default_port": 22},
+    {"name": "Synthetic Attacker (Z)", "entry_ip": "198.51.100.7",
+     "initial_access": "T1078", "default_port": 22}
+  ],
+  "moves": [
+    {"attacker": "Advanced Persistent Threat", "src": "external", "dst": "external_gateway",
+     "technique": "T1078", "kind": "foothold", "t": 1700000000000},
+    {"attacker": "Advanced Persistent Threat", "src": "external_gateway", "dst": "it_host_1",
+     "technique": "T1021.004", "port": 22, "t": 1700000000000},
+    {"attacker": "Advanced Persistent Threat", "src": "it_host_1", "dst": "198.51.100.10",
+     "technique": "T1041", "port": 443, "t": 1700000001000},
+
+    {"attacker": "Synthetic Attacker (Z)", "src": "external", "dst": "external_gateway",
+     "technique": "T1078", "kind": "foothold", "t": 1700000600000},
+    {"attacker": "Synthetic Attacker (Z)", "src": "external_gateway", "dst": "it_host_5",
+     "technique": "T1021.004", "port": 22, "t": 1700000600000},
+    {"attacker": "Synthetic Attacker (Z)", "src": "it_host_5", "dst": "203.0.113.66",
+     "technique": "T1041", "port": 443, "t": 1700000601000}
+  ]
+}

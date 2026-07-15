@@ -1,0 +1,17 @@
+{
+  "topology": "toy",
+  "base_time": 1700000000000,
+  "step_ms": 1000,
+  "attackers": [
+    {"name": "Toy Attacker", "entry_ip": "203.0.113.50", "initial_access": "T1078",
+     "default_port": 22}
+  ],
+  "moves": [
+    {"attacker": "Toy Attacker", "src": "external", "dst": "it_workstation_1",
+     "technique": "T1078", "kind": "foothold"},
+    {"attacker": "Toy Attacker", "src": "it_workstation_1", "dst": "db_admin_workstation",
+     "technique": "T1021.004", "port": 3389},
+    {"attacker": "Toy Attacker", "src": "db_admin_workstation", "dst": "production_db",
+     "technique": "T1021.004", "port": 3306}
+  ]
+}
