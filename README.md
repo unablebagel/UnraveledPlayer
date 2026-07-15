@@ -1,5 +1,5 @@
 ---
-title: Attack Scenario Builder
+title: UnraveledPlayer
 emoji: 🛰️
 colorFrom: blue
 colorTo: indigo
@@ -8,7 +8,7 @@ app_port: 7860
 pinned: false
 ---
 
-# Attack Scenario Builder
+# UnraveledPlayer
 
 Interactive authoring tool for synthetic multi-attacker scenarios: draw an
 attacker's move progression over a network topology in the browser, compile it
