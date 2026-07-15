@@ -1,0 +1,9 @@
+# Render blueprint — creates the free web service when the repo is
+# connected at https://dashboard.render.com (New + > Blueprint).
+services:
+  - type: web
+    name: unraveledplayer
+    runtime: docker
+    plan: free
+    healthCheckPath: /editor.html
+    autoDeploy: true

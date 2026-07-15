@@ -1,13 +1,3 @@
----
-title: UnraveledPlayer
-emoji: 🛰️
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # UnraveledPlayer
 
 Interactive authoring tool for synthetic multi-attacker scenarios: draw an
@@ -17,8 +7,9 @@ to OCSF-style `synthetic_alerts.jsonl`, and see the inferred attacker sessions
 and reverse it into an editable scenario.
 
 This repo is a **standalone deployment snapshot** of the `scenario_builder`
-tool from the `tm-unraveled` research codebase, packaged for a Hugging Face
-Docker Space. The UI is a single `editor.html`; the backend is a stateless
+tool from the `tm-unraveled` research codebase, packaged as a Docker app
+deployed on Render's free tier (`render.yaml` is the blueprint). The UI is
+a single `editor.html`; the backend is a stateless
 stdlib-only `http.server` (the scenario spec lives in the browser's
 localStorage). There are **no third-party Python dependencies**.
 
@@ -67,8 +58,8 @@ python -m pipeline.scenario_builder.test_import
 
 ## Caveats
 
-- No auth: anyone with the Space URL can hit `/compile` with arbitrary spec
-  JSON. The compiler is bounded and the server holds no state, so the blast
-  radius is CPU only — but don't put anything sensitive behind it.
-- Free Spaces sleep after ~48 h without traffic; the first visit after that
-  wakes the container (takes a few seconds).
+- No auth: anyone with the deployment URL can hit `/compile` with arbitrary
+  spec JSON. The compiler is bounded and the server holds no state, so the
+  blast radius is CPU only — but don't put anything sensitive behind it.
+- Render's free instances spin down after ~15 min without traffic; the
+  first visit after that wakes the container (takes up to a minute).

@@ -1,5 +1,6 @@
-# scenario_builder_space — Hugging Face Docker Space.
+# UnraveledPlayer — standalone Docker app (deployed via render.yaml).
 # The whole app is stdlib-only Python (no requirements.txt on purpose).
+# The server reads $PORT at runtime, so the platform's injected value wins.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
