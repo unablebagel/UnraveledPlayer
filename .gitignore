@@ -1,3 +1,8 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# HawkScan run artifacts
+scan_result.json
+scan_stderr.log
+.hawk/
