@@ -13,7 +13,9 @@ deployment and are never overwritten:
 
     pipeline/__init__.py                     (trimmed: docstring only)
     pipeline/evidence_extractor.py           (trimmed: ObservedFact, no pandas)
-    pipeline/scenario_builder/serve.py       (binds 0.0.0.0, reads $PORT)
+    pipeline/scenario_builder/serve.py       (binds 0.0.0.0, reads $PORT,
+                                              adds the /evolution routes)
+    pipeline/scenario_builder/evolution.html (deployment-only page; no upstream)
 
 After the standalone repo is split out of tm-unraveled this script has no
 upstream to copy from and simply errors — that's expected; sync by hand or
@@ -49,6 +51,10 @@ VERBATIM = [
     "stage4_segmented_zone/streaming_timeline.py",
     "stage4_segmented_zone/topology.py",
     "stage4_segmented_zone/synthetic_alerts.jsonl",       # test_import fixture
+    "stage5_session_evolution/__init__.py",
+    "stage5_session_evolution/graph_builder.py",
+    "stage5_session_evolution/visualize.py",
+    "stage5_session_evolution/snapshot_loader.py",
     "scenario_builder/__init__.py",
     "scenario_builder/spec.py",
     "scenario_builder/techniques.py",

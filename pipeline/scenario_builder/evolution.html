@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>scenario_builder — session evolution</title>
+<!-- Deployment-owned page (no upstream twin): renders the stage5
+     session-evolution graph for the spec the editor keeps in localStorage.
+     Self-contained: no external assets. -->
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#fafafa;color:#222}
+ #bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#fff;
+      border-bottom:1px solid #ddd;position:sticky;top:0;z-index:5;flex-wrap:wrap}
+ #bar button{font-size:14px;padding:6px 10px;cursor:pointer}
+ #bar label{font-size:13px;color:#555;display:flex;align-items:center;gap:5px;cursor:pointer}
+ #bar a{font-size:13px;color:#1a73e8;text-decoration:none}
+ #bar a:hover{text-decoration:underline}
+ #bar .title{font-weight:600;font-size:15px;margin-right:6px}
+ #status{font-size:12px;color:#777}
+ #status.err{color:#c62828}
+ #graphWrap{padding:14px;overflow:auto}
+ #graph{background:#fff;border:1px solid #ccc;border-radius:8px;padding:10px;
+        min-height:200px;overflow:auto}
+ #graph svg{max-width:none}
+ #graph pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;margin:0}
+ .hint{font-size:13px;color:#777;padding:24px;text-align:center}
+ .hint a{color:#1a73e8}
+ .note{font-size:12px;color:#8a6d00;background:#fff4e0;border:1px solid #f2c98a;
+       border-radius:6px;padding:8px 10px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="title">Session evolution</span>
+  <button id="refreshBtn">Refresh</button>
+  <label><input type="checkbox" id="gtToggle" checked> show ground truth (eval-only overlay)</label>
+  <button id="dotBtn" disabled>Download .dot</button>
+  <a href="/editor.html">&larr; back to the editor</a>
+  <span id="status"></span>
+</div>
+<div id="graphWrap"><div id="graph"><div class="hint">loading&hellip;</div></div></div>
+<script>
+"use strict";
+const STORAGE_KEY = "scenario_builder_spec";   // written by editor.html
+const graph = document.getElementById('graph');
+const status_ = document.getElementById('status');
+let lastDot = null;
+
+function setStatus(msg, err) {
+  status_.textContent = msg;
+  status_.classList.toggle('err', !!err);
+}
+
+async function render() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    graph.innerHTML = '<div class="hint">No scenario found in this browser. ' +
+      'Draw one in the <a href="/editor.html">editor</a> first — the spec is ' +
+      'shared automatically, then press Refresh here.</div>';
+    setStatus('');
+    return;
+  }
+  const gt = document.getElementById('gtToggle').checked ? '1' : '0';
+  setStatus('compiling + rendering…');
+  document.getElementById('dotBtn').disabled = true;
+  try {
+    const res = await fetch('/evolution?gt=' + gt, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: raw,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      graph.innerHTML = '<div class="hint">Could not compile the current ' +
+        'scenario.</div>';
+      setStatus('ERROR: ' + data.error, true);
+      return;
+    }
+    lastDot = data.dot;
+    document.getElementById('dotBtn').disabled = false;
+    graph.replaceChildren();
+    if (data.note) {
+      const n = document.createElement('div');
+      n.className = 'note'; n.textContent = data.note;
+      graph.appendChild(n);
+    }
+    if (data.svg) {
+      // the server's own Graphviz output for this same-origin request;
+      // hover tooltips come through natively
+      const holder = document.createElement('div');
+      holder.innerHTML = data.svg;
+      graph.appendChild(holder);
+    } else {
+      const pre = document.createElement('pre');
+      pre.textContent = data.dot;
+      graph.appendChild(pre);
+    }
+    setStatus(data.sessions + ' attributed session(s)');
+  } catch (e) {
+    setStatus('ERROR: ' + e, true);
+  }
+}
+
+document.getElementById('refreshBtn').onclick = render;
+document.getElementById('gtToggle').onchange = render;
+document.getElementById('dotBtn').onclick = () => {
+  if (lastDot === null) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lastDot], {type: 'text/vnd.graphviz'}));
+  a.download = 'session_evolution.dot';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+render();
+</script>
+</body>
+</html>

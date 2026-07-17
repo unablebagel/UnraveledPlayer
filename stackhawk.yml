@@ -1,0 +1,22 @@
+app:
+  applicationId: 13339972-1ba4-47f5-97fd-dc7b3d1ff4fc
+  env: ${APP_ENV:Production}
+  host: ${APP_HOST:http://localhost:8765}
+  openApiConf:
+    filePath: stackhawk-openapi.yml
+
+hawk:
+  spider:
+    seedPaths:
+      - /editor.html
+      - /evolution
+
+tags:
+  - name: _STACKHAWK_AGENT
+    value: ${HAWK_AGENT:none}
+  - name: git_origin
+    value: https://github.com/unablebagel/UnraveledPlayer
+  - name: _STACKHAWK_GIT_COMMIT_SHA
+    value: ${COMMIT_SHA:none}
+  - name: _STACKHAWK_GIT_BRANCH
+    value: ${BRANCH_NAME:none}

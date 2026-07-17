@@ -26,6 +26,18 @@ plus two endpoints the page calls over fetch():
             existing hand-coded demo can be pulled INTO the editor. Returns
             {spec, report}; topology is inferred unless the query pins it.
 
+    GET  /evolution
+         -> evolution.html, the stage5 session-evolution viewer. The page
+            reads the spec from the browser's localStorage (the same
+            "scenario_builder_spec" key the editor writes) and POSTs it back.
+
+    POST /evolution[?gt=0|1]
+         -> compiles the posted spec JSON, re-runs the same attribution chain
+            compile._validate uses, and renders the stage5 session-evolution
+            graph. Returns {dot, svg, sessions}; svg is null when the
+            Graphviz `dot` executable is unavailable (the DOT source always
+            comes back). gt=0 strips the eval-only ground-truth overlay.
+
     python -m pipeline.scenario_builder.serve [--port 7860]
 
 Vendored copy for scenario_builder_space (Hugging Face Spaces). Differs from
@@ -38,7 +50,9 @@ sync_from_source.py never overwrites this file.
 import argparse
 import json
 import os
+import subprocess
 import sys
+import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -49,15 +63,20 @@ if sys.platform == "win32":
     except (AttributeError, ValueError):
         pass
 
+from ..mapping_layer import MappingLayer
 from ..toy_diagram import create_unraveled_toy_diagram
 from ..unraveled_diagram import create_unraveled_complete_diagram
+from ..stage2_multi_attacker.attribution import attribute, build_events, split_by_sink
+from ..stage2_multi_attacker.trust_zone import make_zone_of, split_by_target_zone
 from ..stage4_segmented_zone.topology import create_segmented_diagram
+from ..stage5_session_evolution import build_session_graph, find_dot, to_dot
 from .compile import CompileError, compile_scenario
 from .import_alerts import AlertImportError, alerts_to_spec
 from .spec import SpecError, from_dict
 from .techniques import TECHNIQUES
 
 _EDITOR_HTML = Path(__file__).parent / "editor.html"
+_EVOLUTION_HTML = Path(__file__).parent / "evolution.html"
 
 _TOPOLOGY_LOADERS = {
     "segmented": create_segmented_diagram,
@@ -115,23 +134,45 @@ def _topology_payload(name: str) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    # don't advertise BaseHTTP/Python versions in the Server header
+    server_version = "UnraveledPlayer"
+    sys_version = ""
+
+    def _send_security_headers(self) -> None:
+        # 'unsafe-inline' is required: both pages are single-file apps with
+        # inline <script>/<style> by design (no external assets to pin).
+        self.send_header("Content-Security-Policy",
+                         "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                         "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                         "connect-src 'self'; frame-ancestors 'none'")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-Content-Type-Options", "nosniff")
+
     def _send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self._send_security_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_html(self, path: Path) -> None:
+        body = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/editor.html"):
-            body = _EDITOR_HTML.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_html(_EDITOR_HTML)
+            return
+        if parsed.path in ("/evolution", "/evolution.html"):
+            self._send_html(_EVOLUTION_HTML)
             return
         if parsed.path == "/topology":
             name = parse_qs(parsed.query).get("name", ["segmented"])[0]
@@ -150,6 +191,8 @@ class Handler(BaseHTTPRequestHandler):
             self._do_compile(raw)
         elif path == "/import":
             self._do_import(raw, parse_qs(urlparse(self.path).query))
+        elif path == "/evolution":
+            self._do_evolution(raw, parse_qs(urlparse(self.path).query))
         else:
             self._send_json(404, {"error": "no such route"})
 
@@ -168,6 +211,59 @@ class Handler(BaseHTTPRequestHandler):
             "report": report.text(), "jsonl": jsonl, "alert_count": len(alerts),
             "sessions": report.sessions,          # inferred S0..S3 for the editor overlay
         })
+
+    def _do_evolution(self, raw: bytes, query: dict) -> None:
+        """Compile the posted spec, re-run the attribution chain, and render
+        the stage5 session-evolution graph (DOT always, SVG when Graphviz's
+        `dot` is available). Mirrors compile._validate's session pipeline —
+        that helper keeps the sessions internal, so the chain is repeated
+        here rather than reaching into a verbatim upstream file."""
+        include_gt = query.get("gt", ["1"])[0] not in ("0", "false")
+        try:
+            spec = from_dict(json.loads(raw))
+            alerts, _report = compile_scenario(spec)
+        except (SpecError, CompileError) as e:
+            self._send_json(400, {"error": str(e)})
+            return
+        except json.JSONDecodeError as e:
+            self._send_json(400, {"error": f"invalid JSON: {e}"})
+            return
+
+        diagram = _TOPOLOGY_LOADERS[spec.topology]()
+        mapper = MappingLayer(diagram)
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                         encoding="utf-8") as f:
+            for a in alerts:
+                f.write(json.dumps(a) + "\n")
+            tmp_path = Path(f.name)
+        try:
+            events = build_events(tmp_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        zoned = split_by_target_zone(
+            split_by_sink(attribute(events, mapper, diagram), mapper),
+            mapper, make_zone_of(mapper, diagram))
+
+        graph = build_session_graph(zoned, mapper=mapper,
+                                    include_ground_truth=include_gt)
+        title = (f"{spec.topology} — session evolution"
+                 + ("" if include_gt else ", LABEL-FREE view (no ground truth)"))
+        dot_src = to_dot(graph, title=title)
+
+        svg, note = None, None
+        exe = find_dot()
+        if exe is None:
+            note = ("Graphviz 'dot' not found on the server -- returning DOT "
+                    "source only")
+        else:
+            proc = subprocess.run([exe, "-Tsvg"], input=dot_src,
+                                  capture_output=True, text=True)
+            if proc.returncode == 0:
+                svg = proc.stdout
+            else:
+                note = f"dot -Tsvg failed: {proc.stderr.strip()}"
+        self._send_json(200, {"dot": dot_src, "svg": svg, "note": note,
+                              "sessions": len(zoned)})
 
     def _do_import(self, raw: bytes, query: dict) -> None:
         """Reverse a posted synthetic_alerts.jsonl into an editor spec."""

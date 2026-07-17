@@ -21,6 +21,8 @@ localStorage). There are **no third-party Python dependencies**.
 | `GET /topology?name=segmented\|unraveled\|toy` | zones, nodes, edges, technique catalog |
 | `POST /compile` | scenario spec JSON → `{report, jsonl, alert_count, sessions}` |
 | `POST /import[?topology=...]` | alerts JSONL → editor spec (reverse compile) |
+| `GET /evolution` | session-evolution viewer (reads the editor's spec from localStorage) |
+| `POST /evolution[?gt=0\|1]` | scenario spec JSON → stage5 session-evolution graph `{dot, svg, note, sessions}` |
 
 ## Run locally
 
@@ -39,13 +41,19 @@ docker run -p 7860:7860 scenario-builder
 ## Layout
 
 - `pipeline/` — vendored subset of the upstream `log_to_diagram_demo`
-  package, same layout so relative imports run unchanged. Three files are
-  owned here and intentionally differ from upstream: `pipeline/__init__.py`
-  (trimmed), `pipeline/evidence_extractor.py` (trimmed to drop the pandas
-  dependency), and `pipeline/scenario_builder/serve.py` (binds `0.0.0.0` and
-  reads `$PORT`). Everything else is a verbatim copy — fix bugs upstream,
-  then re-run `python sync_from_source.py` (only works from inside the
-  original research repo).
+  package, same layout so relative imports run unchanged. Four files are
+  owned here and intentionally differ from (or don't exist in) upstream:
+  `pipeline/__init__.py` (trimmed), `pipeline/evidence_extractor.py`
+  (trimmed to drop the pandas dependency),
+  `pipeline/scenario_builder/serve.py` (binds `0.0.0.0`, reads `$PORT`, adds
+  the `/evolution` routes), and `pipeline/scenario_builder/evolution.html`
+  (deployment-only viewer page). Everything else is a verbatim copy — fix
+  bugs upstream, then re-run `python sync_from_source.py` (only works from
+  inside the original research repo).
+- `pipeline/stage5_session_evolution/` — vendored verbatim; `serve.py` uses
+  its `build_session_graph`/`to_dot` to render the `/evolution` graph. The
+  SVG render needs the Graphviz `dot` binary (installed in the Docker image;
+  without it the endpoint returns DOT source only).
 - `pipeline/scenario_builder/examples/` — example scenario specs to try in
   the editor or feed to `/compile`.
 
