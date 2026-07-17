@@ -136,6 +136,8 @@ _REFERENCE_FILES = {                       # /reference/<key> -> vendored file
 # when another topology is chosen. Also adds a "Session evolution" button
 # that opens /evolution on the current spec (the campaign model hands off
 # with merge=1 so the graph matches the reference session structure).
+# (Self-loop fan-out, timeline date labels, and the sessions staleness dot
+# started here but are native in editor.html now — upstream owns them.)
 _EDITOR_PATCH = """
 <style>
  #roBanner{display:none;background:#8e2f2f;color:#fff;border-radius:12px;
@@ -144,6 +146,7 @@ _EDITOR_PATCH = """
  body.readonly-model #sidebar input,body.readonly-model #sidebar select,
  body.readonly-model #sidebar button{pointer-events:none;opacity:.55}
  body.readonly-model #stage .node .nbox,body.readonly-model #external{cursor:default}
+ body.readonly-model .hint{display:none}
 </style>
 <script>
 (() => {
@@ -384,7 +387,7 @@ function exitModel(topology) {
   roActive = false; roBackup = null;
   roSnaps = null; roSnapIdx = null;
   roUnbindControls();
-  localStorage.removeItem(HANDOFF_KEY);
+  localStorage.removeItem(HANDOFF_KEY);     // don't leak the campaign handoff
   setLocked(false);
   stage.querySelectorAll('.node').forEach(el => { el.title = ''; });
   spec.topology = topology;
