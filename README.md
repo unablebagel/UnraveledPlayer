@@ -17,7 +17,7 @@ localStorage). There are **no third-party Python dependencies**.
 
 | Route | What it does |
 | --- | --- |
-| `GET /` or `/editor.html` | the editor UI |
+| `GET /` or `/editor.html` | the editor UI; its topology dropdown includes **Unraveled Attack Model (read only)**, a view-only load of the real campaign (deployment-owned patch injected by `serve.py`) |
 | `GET /topology?name=segmented\|unraveled\|toy` | zones, nodes, edges, technique catalog |
 | `GET /examples` | names of the built-in scenario specs |
 | `GET /examples/<name>[.json]` | a built-in spec, read-only (e.g. `unraveled_campaign`) |

@@ -26,6 +26,12 @@ plus two endpoints the page calls over fetch():
             existing hand-coded demo can be pulled INTO the editor. Returns
             {spec, report}; topology is inferred unless the query pins it.
 
+    GET  / (editor.html)
+         -> the editor, with _EDITOR_PATCH appended at serve time: it adds an
+            "Unraveled Attack Model (read only)" entry to the topology
+            dropdown that loads /examples/unraveled_campaign.json view-only
+            (the vendored editor.html itself stays a verbatim upstream copy).
+
     GET  /examples
          -> {"examples": [...]} — the names of the built-in scenario specs
             shipped in scenario_builder/examples/.
@@ -90,6 +96,101 @@ from .techniques import TECHNIQUES
 _EDITOR_HTML = Path(__file__).parent / "editor.html"
 _EVOLUTION_HTML = Path(__file__).parent / "evolution.html"
 _EXAMPLES_DIR = Path(__file__).parent / "examples"
+
+# Deployment-owned patch appended to editor.html at serve time (the file
+# itself stays a verbatim upstream copy). Adds "Unraveled Attack Model
+# (read only)" to the topology dropdown: selecting it stashes the user's
+# draft, loads /examples/unraveled_campaign.json for viewing, and blocks
+# every mutating control until another topology is chosen. View-only
+# controls (playback, compile, inferred sessions, save-a-copy) stay live.
+_EDITOR_PATCH = """
+<style>
+ #roBanner{display:none;background:#8e2f2f;color:#fff;border-radius:12px;
+           padding:3px 10px;font-size:12px;font-weight:600;letter-spacing:.3px}
+ body.readonly-model #roBanner{display:inline-block}
+ body.readonly-model #sidebar input,body.readonly-model #sidebar select,
+ body.readonly-model #sidebar button{pointer-events:none;opacity:.55}
+ body.readonly-model #stage .node .nbox,body.readonly-model #external{cursor:default}
+</style>
+<script>
+(() => {
+'use strict';
+const RO_VALUE = '__unraveled_campaign__';
+let roActive = false, roBackup = null;
+
+const sel = document.getElementById('topologySelect');
+const opt = document.createElement('option');
+opt.value = RO_VALUE;
+opt.textContent = 'Unraveled Attack Model (read only)';
+sel.appendChild(opt);
+
+const banner = document.createElement('span');
+banner.id = 'roBanner';
+banner.textContent = 'READ ONLY \\u2014 real Unraveled campaign';
+document.getElementById('bar').appendChild(banner);
+
+const LOCKED = ['baseTime', 'stepMs', 'defaultTech', 'loadSpecBtn', 'importAlertsBtn'];
+function setLocked(on) {
+  LOCKED.forEach(id => { document.getElementById(id).disabled = on; });
+  document.body.classList.toggle('readonly-model', on);
+}
+
+// Block every mutation path while read-only. All editor handlers run in the
+// target phase, so capture-phase stopPropagation reaches them first.
+document.getElementById('stage').addEventListener('click', e => {
+  if (roActive) e.stopPropagation();            // no new moves from the canvas
+}, true);
+document.addEventListener('dragstart', e => {
+  if (roActive) { e.preventDefault(); e.stopPropagation(); }   // no row reorder
+}, true);
+const RO_ALLOWED = new Set(['topologySelect', 'stepSlider']);  // view-only controls
+['input', 'change'].forEach(t => document.addEventListener(t, e => {
+  if (roActive && !RO_ALLOWED.has(e.target.id)) { e.stopPropagation(); e.preventDefault(); }
+}, true));
+document.addEventListener('focusin', e => {
+  if (roActive && !RO_ALLOWED.has(e.target.id) && e.target.matches('input, select')
+      && e.target.closest('#sidebar, #bar')) e.target.blur();
+}, true);
+
+async function enterModel() {
+  if (roActive) { sel.value = RO_VALUE; return; }
+  let spec;
+  try {
+    const res = await fetch('/examples/unraveled_campaign.json');
+    if (!res.ok) throw new Error((await res.json()).error || ('HTTP ' + res.status));
+    spec = await res.json();
+  } catch (e) {
+    toast('Could not load the campaign model: ' + e);
+    sel.value = state.topology;
+    return;
+  }
+  roBackup = JSON.stringify(state);
+  roActive = true;
+  applyLoadedSpec(spec);                          // renders + persists the model...
+  localStorage.setItem(STORAGE_KEY, roBackup);    // ...so put the user's draft back
+  sel.value = RO_VALUE;
+  setLocked(true);
+  toast('Unraveled Attack Model \\u2014 read only. Press \\u25b6 to replay; pick '
+        + 'another topology to go back to your own scenario.');
+}
+
+function exitModel(topology) {
+  const spec = JSON.parse(roBackup);
+  roActive = false; roBackup = null;
+  setLocked(false);
+  spec.topology = topology;
+  applyLoadedSpec(spec);
+}
+
+const prevOnChange = sel.onchange;
+sel.onchange = ev => {
+  if (ev.target.value === RO_VALUE) enterModel();
+  else if (roActive) exitModel(ev.target.value);
+  else prevOnChange(ev);
+};
+})();
+</script>
+"""
 
 _TOPOLOGY_LOADERS = {
     "segmented": create_segmented_diagram,
@@ -180,8 +281,11 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_html(self, path: Path) -> None:
+    def _send_html(self, path: Path, patch: str = "") -> None:
         body = path.read_bytes()
+        if patch:
+            body = body.replace(b"</body>",
+                                patch.encode("utf-8") + b"\n</body>", 1)
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -192,7 +296,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/editor.html"):
-            self._send_html(_EDITOR_HTML)
+            self._send_html(_EDITOR_HTML, patch=_EDITOR_PATCH)
             return
         if parsed.path in ("/evolution", "/evolution.html"):
             self._send_html(_EVOLUTION_HTML)
