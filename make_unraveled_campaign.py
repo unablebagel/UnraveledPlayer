@@ -42,6 +42,7 @@ has no data to read once the repo is split out):
 """
 
 import json
+import shutil
 import sys
 from collections import Counter
 from pathlib import Path
@@ -56,6 +57,28 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_ALERTS = (HERE.parent.parent / "cybernatics_top7_alerts"
                   / "siem_alerts_enriched_v3.jsonl")
 OUT = HERE / "pipeline" / "scenario_builder" / "examples" / "unraveled_campaign.json"
+
+# The stage2 output the read-only editor model illustrates (served at
+# /reference/*); vendored alongside the condensed spec so the deployment
+# never needs the 7.7 MB raw stream. Refreshed from the research repo's
+# stage2_multi_attacker/output (falling back to the older shared output/).
+REFERENCE_FILES = ("MultiAttacker_Sessions.json", "MultiAttacker_Snapshots.json")
+REFERENCE_DST = HERE / "pipeline" / "scenario_builder" / "reference"
+
+
+def copy_reference(alerts_path: Path) -> None:
+    demo = alerts_path.parent.parent / "log_to_diagram_demo"
+    src_dirs = (demo / "stage2_multi_attacker" / "output", demo / "output")
+    REFERENCE_DST.mkdir(exist_ok=True)
+    for fname in REFERENCE_FILES:
+        src = next((d / fname for d in src_dirs if (d / fname).is_file()), None)
+        if src is None:
+            print(f"[WARN] {fname} not found under {src_dirs[0].parent.name}/ -- "
+                  "run stage2_multi_attacker.run_multi_attacker first; the "
+                  "vendored copy was left as-is")
+            continue
+        shutil.copyfile(src, REFERENCE_DST / fname)
+        print(f"[OK] refreshed reference/{fname} from {src}")
 
 
 def condense(spec: dict) -> dict:
@@ -181,6 +204,7 @@ def main(argv=None) -> int:
 
     from_dict(campaign)                      # validate before writing
     OUT.write_text(json.dumps(campaign, indent=2) + "\n", encoding="utf-8")
+    copy_reference(alerts_path)
 
     print(f"[OK] wrote {OUT}")
     print(f"condensed {len(full['moves'])} imported moves -> "

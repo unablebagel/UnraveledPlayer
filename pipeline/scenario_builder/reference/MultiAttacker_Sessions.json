@@ -1,0 +1,352 @@
+{
+  "metadata": {
+    "generated_at": "2026-07-14T13:58:45.470827",
+    "n_sessions": 4,
+    "attribution": "actor-continuity + foothold-promotion + timing/path (window=60000 ms), then sink-split on distinct external sinks, then rendezvous merge on shared external sink. Label-free; ground truth used only in eval."
+  },
+  "eval_vmeasure": {
+    "before_split": {
+      "homogeneity": 1.0,
+      "completeness": 0.274,
+      "v_measure": 0.43,
+      "n_inferred_sessions": 6,
+      "n_ground_truth_attackers": 3
+    },
+    "after_split": {
+      "homogeneity": 1.0,
+      "completeness": 0.274,
+      "v_measure": 0.43,
+      "n_inferred_sessions": 6,
+      "n_ground_truth_attackers": 3
+    },
+    "after_merge": {
+      "homogeneity": 1.0,
+      "completeness": 0.555,
+      "v_measure": 0.714,
+      "n_inferred_sessions": 4,
+      "n_ground_truth_attackers": 3
+    }
+  },
+  "sessions": [
+    {
+      "session": "S0",
+      "role": "foothold/active",
+      "actor_ips": [
+        "10.1.3.17",
+        "10.1.3.8",
+        "192.168.0.11"
+      ],
+      "touched_nodes": [
+        "database_system",
+        "external_gateway",
+        "it_host_1",
+        "it_host_5"
+      ],
+      "compromised_nodes": [
+        "external_gateway",
+        "it_host_1",
+        "it_host_5"
+      ],
+      "techniques": [
+        "T1018",
+        "T1021.004",
+        "T1030",
+        "T1041",
+        "T1046",
+        "T1070",
+        "T1071.001",
+        "T1078",
+        "T1098",
+        "T1110.001",
+        "T1552",
+        "T1572",
+        "T1573.001"
+      ],
+      "first_seen": "2021-05-26T20:09:59.769000+00:00",
+      "last_seen": "2021-07-17T22:24:47+00:00",
+      "n_facts": 1835,
+      "eval_ground_truth": {
+        "attribution_counts": {
+          "Advanced Persistent Threat": 1693
+        },
+        "majority": "Advanced Persistent Threat",
+        "purity": 1.0
+      }
+    },
+    {
+      "session": "S1",
+      "role": "recon-only",
+      "actor_ips": [
+        "10.8.10.76"
+      ],
+      "touched_nodes": [
+        "external_gateway"
+      ],
+      "compromised_nodes": [],
+      "techniques": [
+        "T1018"
+      ],
+      "first_seen": "2021-06-03T20:39:40.792000+00:00",
+      "last_seen": "2021-06-07T18:10:31.946000+00:00",
+      "n_facts": 258,
+      "eval_ground_truth": {
+        "attribution_counts": {
+          "Advanced Persistent Threat": 258
+        },
+        "majority": "Advanced Persistent Threat",
+        "purity": 1.0
+      }
+    },
+    {
+      "session": "S2",
+      "role": "recon-only",
+      "actor_ips": [
+        "10.8.10.87"
+      ],
+      "touched_nodes": [
+        "external_gateway",
+        "honeypot_server"
+      ],
+      "compromised_nodes": [],
+      "techniques": [
+        "T1110.001",
+        "T1595.001",
+        "T1595.002"
+      ],
+      "first_seen": "2021-06-27T23:02:41.218000+00:00",
+      "last_seen": "2021-07-01T01:19:09.148000+00:00",
+      "n_facts": 330,
+      "eval_ground_truth": {
+        "attribution_counts": {
+          "Amateur Attacker": 330
+        },
+        "majority": "Amateur Attacker",
+        "purity": 1.0
+      }
+    },
+    {
+      "session": "S3",
+      "role": "recon-only",
+      "actor_ips": [
+        "10.1.1.15"
+      ],
+      "touched_nodes": [
+        "hr_host_5"
+      ],
+      "compromised_nodes": [],
+      "techniques": [
+        "T1566.001"
+      ],
+      "first_seen": "2021-06-29T17:13:47+00:00",
+      "last_seen": "2021-06-29T17:13:47+00:00",
+      "n_facts": 1,
+      "eval_ground_truth": {
+        "attribution_counts": {
+          "Skilled Hackers": 1
+        },
+        "majority": "Skilled Hackers",
+        "purity": 1.0
+      }
+    }
+  ],
+  "final_node_breakdown": {
+    "hr_host_5": {
+      "name": "HR & Executive Host 5",
+      "trust_zone": "hr_executive",
+      "ips": [
+        "10.1.1.15"
+      ],
+      "per_attacker": {
+        "S3": {
+          "status": "CLEAN",
+          "confidence": 0.7,
+          "distribution": {
+            "clean": 0.7,
+            "accessed": 0.3,
+            "compromised": 0.0
+          },
+          "role": "recon-only",
+          "predicates": [
+            "hasAppAccess(hr_host_5, read)"
+          ],
+          "techniques": [
+            "T1566.001"
+          ]
+        }
+      }
+    },
+    "it_host_1": {
+      "name": "IT Host 1",
+      "trust_zone": "it",
+      "ips": [
+        "10.1.3.8"
+      ],
+      "per_attacker": {
+        "S0": {
+          "status": "COMPROMISED",
+          "confidence": 1.0,
+          "distribution": {
+            "clean": 0.0,
+            "accessed": 0.0,
+            "compromised": 1.0
+          },
+          "role": "foothold/active",
+          "predicates": [
+            "execCode(it_host_1, admin)",
+            "hasAppAccess(it_host_1, read)"
+          ],
+          "techniques": [
+            "T1018",
+            "T1041",
+            "T1573.001",
+            "T1071.001",
+            "T1021.004",
+            "T1078",
+            "T1046",
+            "T1572"
+          ]
+        }
+      }
+    },
+    "it_host_5": {
+      "name": "IT Host 5",
+      "trust_zone": "it",
+      "ips": [
+        "10.1.3.17"
+      ],
+      "per_attacker": {
+        "S0": {
+          "status": "COMPROMISED",
+          "confidence": 0.9999,
+          "distribution": {
+            "clean": 0.0,
+            "accessed": 0.0001,
+            "compromised": 0.9999
+          },
+          "role": "foothold/active",
+          "predicates": [
+            "execCode(it_host_5, admin)",
+            "hasAppAccess(it_host_5, read)"
+          ],
+          "techniques": [
+            "T1078",
+            "T1110.001",
+            "T1030",
+            "T1070",
+            "T1552",
+            "T1098"
+          ]
+        }
+      }
+    },
+    "honeypot_server": {
+      "name": "Honeypot Server",
+      "trust_zone": "dmz_public",
+      "ips": [
+        "10.1.4.16"
+      ],
+      "per_attacker": {
+        "S2": {
+          "status": "CLEAN",
+          "confidence": 0.7,
+          "distribution": {
+            "clean": 0.7,
+            "accessed": 0.3,
+            "compromised": 0.0
+          },
+          "role": "recon-only",
+          "predicates": [
+            "hasAppAccess(honeypot_server, read)"
+          ],
+          "techniques": [
+            "T1595.001"
+          ]
+        }
+      }
+    },
+    "database_system": {
+      "name": "Database System",
+      "trust_zone": "intranet_private",
+      "ips": [
+        "10.1.5.21"
+      ],
+      "per_attacker": {
+        "S0": {
+          "status": "ACCESSED",
+          "confidence": 0.9,
+          "distribution": {
+            "clean": 0.1,
+            "accessed": 0.9,
+            "compromised": 0.0
+          },
+          "role": "foothold/active",
+          "predicates": [
+            "hasAppAccess(database_system, read)"
+          ],
+          "techniques": [
+            "T1030"
+          ]
+        }
+      }
+    },
+    "external_gateway": {
+      "name": "External Gateway",
+      "trust_zone": "perimeter",
+      "ips": [
+        "192.168.0.11"
+      ],
+      "per_attacker": {
+        "S0": {
+          "status": "COMPROMISED",
+          "confidence": 0.6,
+          "distribution": {
+            "clean": 0.4,
+            "accessed": 0.0,
+            "compromised": 0.6
+          },
+          "role": "foothold/active",
+          "predicates": [
+            "execCode(external_gateway, admin)"
+          ],
+          "techniques": [
+            "T1071.001"
+          ]
+        },
+        "S1": {
+          "status": "CLEAN",
+          "confidence": 0.7,
+          "distribution": {
+            "clean": 0.7,
+            "accessed": 0.3,
+            "compromised": 0.0
+          },
+          "role": "recon-only",
+          "predicates": [
+            "hasAppAccess(external_gateway, read)"
+          ],
+          "techniques": [
+            "T1018"
+          ]
+        },
+        "S2": {
+          "status": "ACCESSED",
+          "confidence": 0.657,
+          "distribution": {
+            "clean": 0.343,
+            "accessed": 0.657,
+            "compromised": 0.0
+          },
+          "role": "recon-only",
+          "predicates": [
+            "hasAppAccess(external_gateway, read)"
+          ],
+          "techniques": [
+            "T1595.001",
+            "T1595.002",
+            "T1110.001"
+          ]
+        }
+      }
+    }
+  }
+}

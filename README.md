@@ -17,14 +17,15 @@ localStorage). There are **no third-party Python dependencies**.
 
 | Route | What it does |
 | --- | --- |
-| `GET /` or `/editor.html` | the editor UI; its topology dropdown includes **Unraveled Attack Model (read only)**, a view-only load of the real campaign (deployment-owned patch injected by `serve.py`) |
+| `GET /` or `/editor.html` | the editor UI; its topology dropdown includes **Unraveled Attack Model (read only)**, which illustrates the research pipeline's published output (`/reference/*`): the slider replays the inference checkpoints, node colors show each checkpoint's compromised/accessed hosts, and *Inferred sessions* shows the final 4-session attribution (deployment-owned patch injected by `serve.py`) |
 | `GET /topology?name=segmented\|unraveled\|toy` | zones, nodes, edges, technique catalog |
 | `GET /examples` | names of the built-in scenario specs |
 | `GET /examples/<name>[.json]` | a built-in spec, read-only (e.g. `unraveled_campaign`) |
+| `GET /reference/sessions` `/reference/snapshots` | the vendored stage2 reference output for the real campaign (`MultiAttacker_Sessions.json` / `MultiAttacker_Snapshots.json`) |
 | `POST /compile` | scenario spec JSON → `{report, jsonl, alert_count, sessions}` |
 | `POST /import[?topology=...]` | alerts JSONL → editor spec (reverse compile) |
 | `GET /evolution` | session-evolution viewer (reads the editor's spec from localStorage) |
-| `POST /evolution[?gt=0\|1]` | scenario spec JSON → stage5 session-evolution graph `{dot, svg, note, sessions}` |
+| `POST /evolution[?gt=0\|1][&merge=1]` | scenario spec JSON → stage5 session-evolution graph `{dot, svg, note, sessions}`; `merge=1` uses stage2's rendezvous merge (the reference chain) instead of the zone split |
 
 ## Run locally
 
@@ -70,6 +71,15 @@ docker run -p 7860:7860 scenario-builder
   valid-account/brute-force/persistence activity on the it hosts) — 21
   moves, 3 attackers. Like `sync_from_source.py`, the generator only runs
   from inside the tm-unraveled research repo.
+- `pipeline/scenario_builder/reference/` — the research pipeline's published
+  stage2 output for that same campaign (`MultiAttacker_Sessions.json`,
+  `MultiAttacker_Snapshots.json`), vendored verbatim and refreshed by
+  `make_unraveled_campaign.py`. The read-only editor model illustrates
+  THESE files (computed from the full 2.3k-alert stream), not a re-compile
+  of the condensed spec — so its session attribution and per-checkpoint
+  host states match the research results exactly, including detail the
+  21 condensed moves alone can't reproduce (belief confidences, techniques
+  outside the editor registry such as T1572).
 
 ## Tests
 
