@@ -98,11 +98,21 @@ _EVOLUTION_HTML = Path(__file__).parent / "evolution.html"
 _EXAMPLES_DIR = Path(__file__).parent / "examples"
 
 # Deployment-owned patch appended to editor.html at serve time (the file
-# itself stays a verbatim upstream copy). Adds "Unraveled Attack Model
-# (read only)" to the topology dropdown: selecting it stashes the user's
-# draft, loads /examples/unraveled_campaign.json for viewing, and blocks
-# every mutating control until another topology is chosen. View-only
-# controls (playback, compile, inferred sessions, save-a-copy) stay live.
+# itself stays a verbatim upstream copy). Adds:
+#   - "Unraveled Attack Model (read only)" in the topology dropdown:
+#     selecting it stashes the user's draft, loads
+#     /examples/unraveled_campaign.json for viewing, and blocks every
+#     mutating control until another topology is chosen. View-only controls
+#     (playback, compile, inferred sessions, save-a-copy) stay live, and the
+#     step bar invites replay instead of move authoring.
+#   - a "Session evolution" toolbar button opening /evolution in a new tab;
+#     in read-only mode it hands the on-screen campaign spec to the viewer
+#     via localStorage (evolution.html's HANDOFF_KEY), since the draft in
+#     STORAGE_KEY is not what the user is looking at.
+#   - a guide-modal section documenting the campaign model and the
+#     Session evolution button.
+# (Self-loop fan-out, timeline date labels, and the sessions staleness dot
+# started here but are native in editor.html now — upstream owns them.)
 _EDITOR_PATCH = """
 <style>
  #roBanner{display:none;background:#8e2f2f;color:#fff;border-radius:12px;
@@ -111,11 +121,13 @@ _EDITOR_PATCH = """
  body.readonly-model #sidebar input,body.readonly-model #sidebar select,
  body.readonly-model #sidebar button{pointer-events:none;opacity:.55}
  body.readonly-model #stage .node .nbox,body.readonly-model #external{cursor:default}
+ body.readonly-model .hint{display:none}
 </style>
 <script>
 (() => {
 'use strict';
 const RO_VALUE = '__unraveled_campaign__';
+const HANDOFF_KEY = 'scenario_builder_evolution_spec';   // read by evolution.html
 let roActive = false, roBackup = null;
 
 const sel = document.getElementById('topologySelect');
@@ -128,6 +140,37 @@ const banner = document.createElement('span');
 banner.id = 'roBanner';
 banner.textContent = 'READ ONLY \\u2014 real Unraveled campaign';
 document.getElementById('bar').appendChild(banner);
+
+// Route to the session-evolution viewer. The viewer reads the spec from
+// localStorage, which in read-only mode holds the stashed DRAFT, not the
+// campaign on screen -- so hand off the on-screen spec explicitly.
+const evoBtn = document.createElement('button');
+evoBtn.textContent = 'Session evolution \\u2197';
+evoBtn.title = 'open the inferred session-evolution graph for the scenario '
+             + 'you are viewing (opens a new tab)';
+const helpBtn = document.getElementById('helpBtn');
+helpBtn.parentNode.insertBefore(evoBtn, helpBtn);
+evoBtn.onclick = () => {
+  if (roActive) {
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify(
+      {title: 'Unraveled Attack Model (read only)', spec: state}));
+  } else {
+    localStorage.removeItem(HANDOFF_KEY);   // viewer falls back to the draft
+  }
+  window.open('/evolution', '_blank', 'noopener');
+};
+
+// In read-only mode the step bar must invite REPLAY, not move authoring.
+const origUpdateStepBar = updateStepBar;
+updateStepBar = function () {
+  if (!roActive) { origUpdateStepBar(); return; }
+  document.getElementById('stepBar').classList.remove('warn');
+  document.getElementById('stepSwatch').style.display = 'none';
+  document.getElementById('stepAttacker').textContent = 'Unraveled Attack Model';
+  document.getElementById('stepMsg').textContent =
+    '\\u2014 read-only campaign view. Press \\u25b6 or drag the slider to '
+    + 'replay; click a legend chip to isolate an attacker.';
+};
 
 const LOCKED = ['baseTime', 'stepMs', 'defaultTech', 'loadSpecBtn', 'importAlertsBtn'];
 function setLocked(on) {
@@ -170,6 +213,7 @@ async function enterModel() {
   localStorage.setItem(STORAGE_KEY, roBackup);    // ...so put the user's draft back
   sel.value = RO_VALUE;
   setLocked(true);
+  updateStepBar();
   toast('Unraveled Attack Model \\u2014 read only. Press \\u25b6 to replay; pick '
         + 'another topology to go back to your own scenario.');
 }
@@ -177,6 +221,7 @@ async function enterModel() {
 function exitModel(topology) {
   const spec = JSON.parse(roBackup);
   roActive = false; roBackup = null;
+  localStorage.removeItem(HANDOFF_KEY);     // don't leak the campaign handoff
   setLocked(false);
   spec.topology = topology;
   applyLoadedSpec(spec);
@@ -189,15 +234,20 @@ sel.onchange = ev => {
   else prevOnChange(ev);
 };
 
-// The vendored renderer stacks every self-loop of a node at the same spot
-// (its k offset is only applied to node-to-node curves); the campaign model
-// puts several host-log self-loops on one host, so fan them out sideways.
-const origDrawMoveCurve = drawMoveCurve;
-drawMoveCurve = function (svg, m, i, a, rS, rD, sr, k) {
-  const el = origDrawMoveCurve(svg, m, i, a, rS, rD, sr, k);
-  if (m.src === m.dst && k) el.g.setAttribute('transform', 'translate(' + (k * 24) + ' 0)');
-  return el;
-};
+// Keep the guide honest about the deployment-added features.
+const guideActions = document.querySelector('#guideModal .guide-actions');
+const gh = document.createElement('h3');
+gh.textContent = 'Built-in campaign & session graph';
+const gp = document.createElement('p');
+gp.innerHTML = 'Pick <b>Unraveled Attack Model (read only)</b> in the Topology menu '
+  + 'to explore the real Unraveled campaign: 2,272 network-flow alerts condensed '
+  + 'to one move per distinct attacker/src/dst/technique, plus host-log '
+  + 'detections drawn as footholds and self-loops. It is view-only \\u2014 replay '
+  + 'it, compile it, then pick any other topology to return to your own scenario. '
+  + '<b>Session evolution \\u2197</b> (top bar) opens the attribution graph for '
+  + 'whatever is on screen, in a new tab.';
+guideActions.parentNode.insertBefore(gh, guideActions);
+guideActions.parentNode.insertBefore(gp, guideActions);
 })();
 </script>
 """

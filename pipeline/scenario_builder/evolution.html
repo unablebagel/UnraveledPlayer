@@ -15,6 +15,9 @@
  #bar a{font-size:13px;color:#1a73e8;text-decoration:none}
  #bar a:hover{text-decoration:underline}
  #bar .title{font-weight:600;font-size:15px;margin-right:6px}
+ #specSource{font-size:12px;background:#eef3fd;color:#1a4fa0;border:1px solid #c6d7f5;
+             border-radius:12px;padding:3px 10px}
+ #specSource:empty{display:none}
  #status{font-size:12px;color:#777}
  #status.err{color:#c62828}
  #graphWrap{padding:14px;overflow:auto}
@@ -35,15 +38,29 @@
   <label><input type="checkbox" id="gtToggle" checked> show ground truth (eval-only overlay)</label>
   <button id="dotBtn" disabled>Download .dot</button>
   <a href="/editor.html">&larr; back to the editor</a>
+  <span id="specSource"></span>
   <span id="status"></span>
 </div>
 <div id="graphWrap"><div id="graph"><div class="hint">loading&hellip;</div></div></div>
 <script>
 "use strict";
 const STORAGE_KEY = "scenario_builder_spec";   // written by editor.html
+// Written by the editor's "Session evolution" button when it is showing
+// something OTHER than the draft in STORAGE_KEY (the read-only campaign
+// model); {title, spec}. Cleared when the editor returns to normal editing.
+const HANDOFF_KEY = "scenario_builder_evolution_spec";
 const graph = document.getElementById('graph');
 const status_ = document.getElementById('status');
 let lastDot = null;
+
+function currentSpec() {                       // -> {raw, label}
+  try {
+    const h = JSON.parse(localStorage.getItem(HANDOFF_KEY));
+    if (h && h.spec) return {raw: JSON.stringify(h.spec),
+                             label: h.title || 'handed off from the editor'};
+  } catch (e) { /* fall through to the draft */ }
+  return {raw: localStorage.getItem(STORAGE_KEY), label: null};
+}
 
 function setStatus(msg, err) {
   status_.textContent = msg;
@@ -51,7 +68,9 @@ function setStatus(msg, err) {
 }
 
 async function render() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const {raw, label} = currentSpec();
+  document.getElementById('specSource').textContent =
+      label ? 'viewing: ' + label : '';
   if (!raw) {
     graph.innerHTML = '<div class="hint">No scenario found in this browser. ' +
       'Draw one in the <a href="/editor.html">editor</a> first — the spec is ' +
