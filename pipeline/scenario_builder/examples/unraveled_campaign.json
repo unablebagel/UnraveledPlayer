@@ -16,6 +16,13 @@
       "initial_access": "T1018",
       "prov": null,
       "default_port": 22
+    },
+    {
+      "name": "Skilled Hackers",
+      "entry_ip": "203.0.113.50",
+      "initial_access": "T1566.001",
+      "prov": null,
+      "default_port": 22
     }
   ],
   "moves": [
@@ -100,6 +107,14 @@
       "technique": "T1110.001",
       "t": 1624946244281,
       "kind": "foothold; aggregates 40 alerts"
+    },
+    {
+      "attacker": "Skilled Hackers",
+      "src": "external",
+      "dst": "hr_host_5",
+      "technique": "T1566.001",
+      "t": 1624986827000,
+      "kind": "foothold; host-log detection (source IP unknown)"
     },
     {
       "attacker": "Advanced Persistent Threat",

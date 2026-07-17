@@ -13,11 +13,21 @@ script reverses it with import_alerts.alerts_to_spec (topology pinned to
 move's explicit `t`, the modal destination port, and the aggregate alert count
 in the informational `kind` field. Moves are emitted in chronological order.
 
+Host-log alerts carry no dst_endpoint, so they cannot become src->dst moves
+directly — but silently dropping all 10 of them would erase the "Skilled
+Hackers" actor, who only ever appears in host logs (one T1566.001
+spearphishing detection on hr_host_5). So attackers with NO network-flow
+presence get their initial-access host-log alert (T1078/T1566.001)
+represented as a foothold move from EXTERNAL onto the observed host, at the
+alert's start_time. Host logs record no source IP, so such an attacker's
+entry_ip is a TEST-NET-3 placeholder (203.0.113.x), flagged in the move's
+`kind`.
+
 What is intentionally lost relative to the raw stream:
   - alert volume (kept only as the "aggregates N alerts" note in `kind`);
-  - the 10 host-log alerts (they carry no dst_endpoint, so they cannot be a
-    src->dst move without inventing a destination) — this also drops the
-    "Skilled Hackers" actor, who only ever appears in host logs.
+  - host-log behaviors of attackers already present via network flows (e.g.
+    the APT's valid-account logons and SSH tunneling on the it hosts): their
+    source/destination is not observable, and the actor is already on the map.
 
 Run from inside the tm-unraveled research repo (like sync_from_source.py, this
 has no data to read once the repo is split out):
@@ -31,7 +41,8 @@ from collections import Counter
 from pathlib import Path
 
 from pipeline.ocsf_to_facts import _load_jsonl
-from pipeline.scenario_builder.import_alerts import alerts_to_spec
+from pipeline.scenario_builder.compile import _TOPOLOGY_LOADERS
+from pipeline.scenario_builder.import_alerts import _reverse_ip_map, alerts_to_spec
 from pipeline.scenario_builder.spec import from_dict
 
 HERE = Path(__file__).resolve().parent
@@ -81,6 +92,42 @@ def condense(spec: dict) -> dict:
             "attackers": spec["attackers"], "moves": moves}
 
 
+_INITIAL_ACCESS = ("T1078", "T1566.001")
+_PLACEHOLDER_ENTRY = "203.0.113.{}"     # TEST-NET-3: host logs record no source
+
+
+def hostlog_footholds(alerts: list, known_attackers: set) -> tuple:
+    """(attackers, moves) synthesized for actors that appear ONLY in host
+    logs: their first initial-access host-log alert becomes a foothold move
+    from EXTERNAL onto the observed host."""
+    ip2node = _reverse_ip_map(_TOPOLOGY_LOADERS["unraveled"]())
+    seen = set(known_attackers)
+    attackers, moves = [], []
+    for a in alerts:
+        unmapped = a.get("unmapped") or {}
+        if unmapped.get("raw_data", {}).get("data_type") != "host_log":
+            continue
+        name = unmapped.get("attacker_attribution")
+        attacks = (a.get("finding_info") or {}).get("attacks") or []
+        tech = attacks[0]["technique"]["uid"] if attacks else None
+        host_ip = ((a.get("evidences") or [{}])[0].get("src_endpoint") or {}).get("ip")
+        if not name or name in seen or tech not in _INITIAL_ACCESS or not host_ip:
+            continue
+        seen.add(name)
+        attackers.append({
+            "name": name,
+            "entry_ip": _PLACEHOLDER_ENTRY.format(50 + len(attackers)),
+            "initial_access": tech, "prov": None, "default_port": 22,
+        })
+        moves.append({
+            "attacker": name, "src": "external",
+            "dst": ip2node.get(host_ip, host_ip), "technique": tech,
+            "t": a.get("start_time") or a.get("time"),
+            "kind": "foothold; host-log detection (source IP unknown)",
+        })
+    return attackers, moves
+
+
 def main(argv=None) -> int:
     args = sys.argv[1:] if argv is None else argv
     alerts_path = Path(args[0]) if args else DEFAULT_ALERTS
@@ -93,12 +140,21 @@ def main(argv=None) -> int:
     alerts = _load_jsonl(alerts_path)
     full, report = alerts_to_spec(alerts, topology="unraveled")
     campaign = condense(full)
+
+    extra_attackers, extra_moves = hostlog_footholds(
+        alerts, {a["name"] for a in campaign["attackers"]})
+    campaign["attackers"] += extra_attackers
+    campaign["moves"] = sorted(campaign["moves"] + extra_moves,
+                               key=lambda m: m["t"])
+    campaign["base_time"] = campaign["moves"][0]["t"]
+
     from_dict(campaign)                      # validate before writing
     OUT.write_text(json.dumps(campaign, indent=2) + "\n", encoding="utf-8")
 
     print(f"[OK] wrote {OUT}")
     print(f"condensed {len(full['moves'])} imported moves -> "
-          f"{len(campaign['moves'])} campaign moves, "
+          f"{len(campaign['moves'])} campaign moves "
+          f"({len(extra_moves)} host-log foothold(s)), "
           f"{len(campaign['attackers'])} attacker(s)")
     print("\n".join(report))
     return 0
