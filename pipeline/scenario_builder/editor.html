@@ -55,6 +55,9 @@
  #stepBar .swatch{width:14px;height:14px;border-radius:50%}
  #stepBar b{white-space:nowrap}
  #stepMsg b{color:#1a4fa0}
+ .mv-time{font-size:10px;color:#8892a0;white-space:nowrap;margin-top:1px}
+ #viewSessions.stale::after{content:'\25cf';color:#e0a500;margin-left:5px;
+                            font-size:9px;vertical-align:middle}
  .tech-select{border:1px solid #9db8e6;background:#f5f9ff;border-radius:4px}
  tr.flash{animation:rowflash 1.6s ease-out}
  @keyframes rowflash{from{background:#fff3cd}to{background:transparent}}
@@ -267,6 +270,8 @@ function saveLocal() {
     sessionData = null;                   // (guarded so repeated keystrokes stay cheap)
     if (viewMode === 'sessions') { updateOverlay(); renderLegendDispatch(); }
   }
+  syncStaleBadge();
+  updateMoveTimeLabels();
 }
 
 function attackerByName(name) {
@@ -595,7 +600,8 @@ function drawMoveCurve(svg, m, i, a, rS, rD, sr, k) {
   const x1 = rD.left - sr.left + rD.width / 2, y1 = rD.top - sr.top + rD.height / 2;
   let d, bx, by;                            // path + badge anchor
   if (m.src === m.dst) {                    // hand-edited self-loop
-    const tx = x0 + rS.width / 4, ty = y0 - rS.height / 2;
+    // k fans out stacked self-loops on the same node (0, +1, -1, ...)
+    const tx = x0 + rS.width / 4 + k * 24, ty = y0 - rS.height / 2;
     d = `M ${tx - 9} ${ty} a 13 13 0 1 1 18 -3`;
     bx = tx; by = ty - 26;
   } else {
@@ -1094,6 +1100,7 @@ function renderMoves(flashIndex) {
     tr.appendChild(portTd);
 
     const tTd = document.createElement('td');
+    tTd.className = 't-cell';
     const tInp = document.createElement('input');
     tInp.type = 'number'; tInp.value = m.t == null ? '' : m.t;
     tInp.placeholder = '(auto)';
@@ -1110,9 +1117,52 @@ function renderMoves(flashIndex) {
 
     tbody.appendChild(tr);
   });
+  updateMoveTimeLabels();
+}
+
+// human-readable UTC dates under the timeline's raw epoch-ms `t` inputs; rows
+// with a blank t show the effective base_time/prev + step_ms cadence value.
+// Re-run from saveLocal so the labels track t/base/step edits live.
+function fmtUtcMinute(ms) {
+  const d = new Date(ms), p = n => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate())
+       + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + 'Z';
+}
+function updateMoveTimeLabels() {
+  const rows = document.querySelectorAll('#movesTable tbody tr');
+  let prev = null;
+  state.moves.forEach((m, i) => {
+    const eff = m.t != null ? m.t
+              : (i === 0 ? state.base_time : prev + state.step_ms);
+    prev = eff;
+    const td = rows[i] ? rows[i].querySelector('td.t-cell') : null;
+    if (!td || isNaN(eff)) return;
+    td.querySelectorAll('.mv-time').forEach(el => el.remove());
+    const label = document.createElement('div');
+    label.className = 'mv-time';
+    label.textContent = fmtUtcMinute(eff) + (m.t == null ? ' (auto)' : '');
+    td.appendChild(label);
+    const inp = td.querySelector('input');
+    if (inp) inp.title = new Date(eff).toISOString()
+                       + (m.t == null ? ' (auto: base/prev + step)' : '');
+  });
+  const bt = document.getElementById('baseTime');
+  bt.title = isNaN(state.base_time) ? '' : fmtUtcMinute(state.base_time) + ' (UTC)';
 }
 
 // ---------------------------------------------------------------- compile
+
+// amber dot on the "Inferred sessions" toggle whenever the spec has changed
+// since the last compile (saveLocal nulls sessionData silently otherwise)
+function syncStaleBadge() {
+  const btn = document.getElementById('viewSessions');
+  const stale = sessionData === null && state.moves.length > 0;
+  btn.classList.toggle('stale', stale);
+  btn.title = stale
+    ? 'sessions are stale — the spec changed since the last compile; '
+      + 'press "Compile & validate" to refresh'
+    : 'sessions the engine infers (S0…S3) — Compile first';
+}
 
 document.getElementById('compileBtn').onclick = async () => {
   const report = document.getElementById('report');
@@ -1134,6 +1184,7 @@ document.getElementById('compileBtn').onclick = async () => {
     lastCompiledJsonl = data.jsonl;
     document.getElementById('downloadBtn').disabled = false;
     sessionData = (data.sessions && data.sessions.length) ? data.sessions : null;
+    syncStaleBadge();
     if (viewMode === 'sessions') redrawMoveLines();   // refresh the overlay with fresh sessions
     else toast(`Compiled. ${sessionData ? sessionData.length : 0} inferred session(s) — `
                + `switch to "Inferred sessions" to see them.`);
@@ -1292,6 +1343,7 @@ document.getElementById('baseTime').value = state.base_time;
 document.getElementById('stepMs').value = state.step_ms;
 renderRoster();
 updateStepBar();
+syncStaleBadge();
 loadTopology(state.topology);
 </script>
 </body>
