@@ -64,8 +64,10 @@ docker run -p 7860:7860 scenario-builder
   stage1_streaming replay input) by `make_unraveled_campaign.py` — 2,272
   network-flow alerts reverse-imported and condensed to one move per
   distinct attacker/src/dst/technique (first-seen times, aggregate counts in
-  each move's `kind`), plus a synthesized foothold for any actor seen only
-  in host logs (Skilled Hackers' T1566.001 spearphish on `hr_host_5`): 14
+  each move's `kind`), plus the host-log detections: a synthesized foothold
+  for any actor seen only in host logs (Skilled Hackers' T1566.001 spearphish
+  on `hr_host_5`) and self-loop moves for local observations (the APT's
+  valid-account/brute-force/persistence activity on the it hosts) — 21
   moves, 3 attackers. Like `sync_from_source.py`, the generator only runs
   from inside the tm-unraveled research repo.
 

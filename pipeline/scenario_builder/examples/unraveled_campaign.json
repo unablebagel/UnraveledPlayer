@@ -68,6 +68,54 @@
     },
     {
       "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "it_host_1",
+      "technique": "T1071.001",
+      "t": 1624635376000,
+      "kind": "host-log detection (local observation)"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "it_host_1",
+      "technique": "T1021.004",
+      "t": 1624635376000,
+      "kind": "host-log detection (local observation)"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "it_host_1",
+      "technique": "T1078",
+      "t": 1624635376000,
+      "kind": "host-log detection (local observation)"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "it_host_1",
+      "technique": "T1046",
+      "t": 1624635486000,
+      "kind": "host-log detection (local observation)"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "it_host_5",
+      "technique": "T1078",
+      "t": 1624635528000,
+      "kind": "host-log detection (local observation); aggregates 2 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "it_host_5",
+      "technique": "T1110.001",
+      "t": 1624637302000,
+      "kind": "host-log detection (local observation)"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
       "src": "it_host_5",
       "dst": "10.8.10.84",
       "technique": "T1030",
@@ -139,6 +187,14 @@
       "technique": "T1552",
       "t": 1625265845728,
       "kind": "aggregates 2 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "it_host_5",
+      "technique": "T1098",
+      "t": 1626560687000,
+      "kind": "host-log detection (local observation)"
     }
   ]
 }

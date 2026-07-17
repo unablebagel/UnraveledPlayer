@@ -188,6 +188,16 @@ sel.onchange = ev => {
   else if (roActive) exitModel(ev.target.value);
   else prevOnChange(ev);
 };
+
+// The vendored renderer stacks every self-loop of a node at the same spot
+// (its k offset is only applied to node-to-node curves); the campaign model
+// puts several host-log self-loops on one host, so fan them out sideways.
+const origDrawMoveCurve = drawMoveCurve;
+drawMoveCurve = function (svg, m, i, a, rS, rD, sr, k) {
+  const el = origDrawMoveCurve(svg, m, i, a, rS, rD, sr, k);
+  if (m.src === m.dst && k) el.g.setAttribute('transform', 'translate(' + (k * 24) + ' 0)');
+  return el;
+};
 })();
 </script>
 """
