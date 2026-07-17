@@ -1,0 +1,129 @@
+{
+  "topology": "unraveled",
+  "base_time": 1622059799769,
+  "step_ms": 900003,
+  "attackers": [
+    {
+      "name": "Amateur Attacker",
+      "entry_ip": "10.8.10.87",
+      "initial_access": "T1110.001",
+      "prov": null,
+      "default_port": 22
+    },
+    {
+      "name": "Advanced Persistent Threat",
+      "entry_ip": "10.8.10.76",
+      "initial_access": "T1018",
+      "prov": null,
+      "default_port": 22
+    }
+  ],
+  "moves": [
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "database_system",
+      "technique": "T1018",
+      "t": 1622059799769,
+      "kind": "aggregates 78 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "external",
+      "dst": "external_gateway",
+      "technique": "T1018",
+      "t": 1622752780792,
+      "kind": "foothold; aggregates 258 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "external_gateway",
+      "dst": "10.8.10.84",
+      "technique": "T1071.001",
+      "t": 1624319416843,
+      "kind": "aggregates 792 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "10.8.10.84",
+      "technique": "T1041",
+      "t": 1624320363656,
+      "kind": "aggregates 30 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_1",
+      "dst": "10.8.10.84",
+      "technique": "T1573.001",
+      "t": 1624347482391,
+      "kind": "aggregates 468 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "10.8.10.84",
+      "technique": "T1030",
+      "t": 1624667145400,
+      "kind": "aggregates 165 alerts"
+    },
+    {
+      "attacker": "Amateur Attacker",
+      "src": "external",
+      "dst": "external_gateway",
+      "technique": "T1595.001",
+      "t": 1624834961218,
+      "port": 2222,
+      "kind": "foothold; aggregates 236 alerts"
+    },
+    {
+      "attacker": "Amateur Attacker",
+      "src": "external",
+      "dst": "external_gateway",
+      "technique": "T1595.002",
+      "t": 1624834961219,
+      "port": 8080,
+      "kind": "foothold"
+    },
+    {
+      "attacker": "Amateur Attacker",
+      "src": "external",
+      "dst": "honeypot_server",
+      "technique": "T1595.001",
+      "t": 1624834962349,
+      "kind": "foothold; aggregates 53 alerts"
+    },
+    {
+      "attacker": "Amateur Attacker",
+      "src": "external",
+      "dst": "external_gateway",
+      "technique": "T1110.001",
+      "t": 1624946244281,
+      "kind": "foothold; aggregates 40 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "database_system",
+      "technique": "T1030",
+      "t": 1625184650361,
+      "kind": "aggregates 142 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "10.8.10.84",
+      "technique": "T1070",
+      "t": 1625260419239,
+      "kind": "aggregates 7 alerts"
+    },
+    {
+      "attacker": "Advanced Persistent Threat",
+      "src": "it_host_5",
+      "dst": "10.8.10.84",
+      "technique": "T1552",
+      "t": 1625265845728,
+      "kind": "aggregates 2 alerts"
+    }
+  ]
+}

@@ -19,6 +19,8 @@ localStorage). There are **no third-party Python dependencies**.
 | --- | --- |
 | `GET /` or `/editor.html` | the editor UI |
 | `GET /topology?name=segmented\|unraveled\|toy` | zones, nodes, edges, technique catalog |
+| `GET /examples` | names of the built-in scenario specs |
+| `GET /examples/<name>[.json]` | a built-in spec, read-only (e.g. `unraveled_campaign`) |
 | `POST /compile` | scenario spec JSON → `{report, jsonl, alert_count, sessions}` |
 | `POST /import[?topology=...]` | alerts JSONL → editor spec (reverse compile) |
 | `GET /evolution` | session-evolution viewer (reads the editor's spec from localStorage) |
@@ -55,7 +57,15 @@ docker run -p 7860:7860 scenario-builder
   SVG render needs the Graphviz `dot` binary (installed in the Docker image;
   without it the endpoint returns DOT source only).
 - `pipeline/scenario_builder/examples/` — example scenario specs to try in
-  the editor or feed to `/compile`.
+  the editor or feed to `/compile`, served read-only at `/examples/<name>`.
+  `unraveled_campaign.json` is owned here (no upstream copy): it is the real
+  default Unraveled attack campaign on the `unraveled` topology, generated
+  from the enriched SIEM alert stream (`siem_alerts_enriched_v3.jsonl`, the
+  stage1_streaming replay input) by `make_unraveled_campaign.py` — 2,272
+  network-flow alerts reverse-imported and condensed to 13 moves (one per
+  distinct attacker/src/dst/technique, first-seen times, aggregate counts in
+  each move's `kind`). Like `sync_from_source.py`, the generator only runs
+  from inside the tm-unraveled research repo.
 
 ## Tests
 

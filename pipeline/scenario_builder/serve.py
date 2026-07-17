@@ -26,6 +26,18 @@ plus two endpoints the page calls over fetch():
             existing hand-coded demo can be pulled INTO the editor. Returns
             {spec, report}; topology is inferred unless the query pins it.
 
+    GET  /examples
+         -> {"examples": [...]} — the names of the built-in scenario specs
+            shipped in scenario_builder/examples/.
+
+    GET  /examples/<name>[.json]
+         -> the named built-in spec, verbatim. READ-ONLY: there is no write
+            path; `unraveled_campaign` is the canonical scenario of the real
+            default Unraveled campaign on the `unraveled` topology (generated
+            by make_unraveled_campaign.py from the enriched SIEM alert
+            stream). Save the response and feed it to the editor's
+            "Load spec" button, or POST it to /compile or /evolution.
+
     GET  /evolution
          -> evolution.html, the stage5 session-evolution viewer. The page
             reads the spec from the browser's localStorage (the same
@@ -77,6 +89,7 @@ from .techniques import TECHNIQUES
 
 _EDITOR_HTML = Path(__file__).parent / "editor.html"
 _EVOLUTION_HTML = Path(__file__).parent / "evolution.html"
+_EXAMPLES_DIR = Path(__file__).parent / "examples"
 
 _TOPOLOGY_LOADERS = {
     "segmented": create_segmented_diagram,
@@ -130,6 +143,16 @@ def _topology_payload(name: str) -> dict:
         })
     techniques = {tid: {"desc": t[6], "tactic": t[2]} for tid, t in TECHNIQUES.items()}
     edges = [{"source": e.source_id, "target": e.target_id, "label": e.label} for e in getattr(diagram, "edges", [])]
+    # The editor renders an EXTERNAL (internet) box on every topology, but the
+    # diagrams intentionally exclude external entities, so nothing connects it.
+    # Give it a display-only backbone edge into each perimeter node ('external'
+    # is the editor's sentinel id, resolved specially by its renderer); the toy
+    # topology has no perimeter zone and is left unchanged.
+    for z in zones:
+        if z["id"] == "perimeter":
+            for n in z["nodes"]:
+                edges.append({"source": "external", "target": n["id"],
+                              "label": "Inbound Internet"})
     return {"topology": name, "zones": zones, "techniques": techniques, "edges": edges}
 
 
@@ -173,6 +196,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path in ("/evolution", "/evolution.html"):
             self._send_html(_EVOLUTION_HTML)
+            return
+        if parsed.path == "/examples":
+            names = sorted(p.stem for p in _EXAMPLES_DIR.glob("*.json"))
+            self._send_json(200, {"examples": names})
+            return
+        if parsed.path.startswith("/examples/"):
+            name = parsed.path[len("/examples/"):]
+            if name.endswith(".json"):
+                name = name[:-len(".json")]
+            # whitelist the name shape; no separators, so no path traversal
+            if not name.replace("-", "").replace("_", "").isalnum():
+                self._send_json(400, {"error": f"bad example name {name!r}"})
+                return
+            path = _EXAMPLES_DIR / f"{name}.json"
+            if not path.is_file():
+                self._send_json(404, {"error": f"no such example {name!r}"})
+                return
+            self._send_json(200, json.loads(path.read_text(encoding="utf-8")))
             return
         if parsed.path == "/topology":
             name = parse_qs(parsed.query).get("name", ["segmented"])[0]
