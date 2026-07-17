@@ -110,6 +110,12 @@ _EXAMPLES_DIR = Path(__file__).parent / "examples"
 #     via localStorage (evolution.html's HANDOFF_KEY), since the draft in
 #     STORAGE_KEY is not what the user is looking at.
 #   - self-loop fan-out so stacked host-log moves stay readable.
+#   - human-readable UTC dates under the timeline's epoch-ms `t` inputs
+#     (auto rows show the effective cadence value), live while typing.
+#   - a staleness dot on "Inferred sessions" whenever the spec has changed
+#     since the last compile (sessionData was nulled silently before).
+#   - a guide-modal section documenting the campaign model and the
+#     Session evolution button.
 _EDITOR_PATCH = """
 <style>
  #roBanner{display:none;background:#8e2f2f;color:#fff;border-radius:12px;
@@ -243,6 +249,73 @@ drawMoveCurve = function (svg, m, i, a, rS, rD, sr, k) {
   if (m.src === m.dst && k) el.g.setAttribute('transform', 'translate(' + (k * 24) + ' 0)');
   return el;
 };
+
+// Human-readable timestamps under the timeline's raw epoch-ms `t` inputs
+// (auto rows show the effective base_time/prev + step_ms cadence value).
+const fmtUtc = ms => {
+  const d = new Date(ms), p = n => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate())
+       + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + 'Z';
+};
+function annotateMoveTimes() {
+  const rows = document.querySelectorAll('#movesTable tbody tr');
+  let prev = null;
+  state.moves.forEach((m, i) => {
+    const eff = m.t != null ? m.t
+              : (i === 0 ? state.base_time : prev + state.step_ms);
+    prev = eff;
+    const td = rows[i] && rows[i].children[7];
+    if (!td || isNaN(eff)) return;
+    td.querySelectorAll('.mv-time').forEach(e => e.remove());
+    const label = document.createElement('div');
+    label.className = 'mv-time';
+    label.textContent = fmtUtc(eff) + (m.t == null ? ' (auto)' : '');
+    td.appendChild(label);
+    const inp = td.querySelector('input');
+    if (inp) inp.title = new Date(eff).toISOString()
+                       + (m.t == null ? ' (auto: base/prev + step)' : '');
+  });
+  document.getElementById('baseTime').title =
+      isNaN(state.base_time) ? '' : fmtUtc(state.base_time) + ' (UTC)';
+}
+const origRenderMoves = renderMoves;
+renderMoves = function (flashIndex) { origRenderMoves(flashIndex); annotateMoveTimes(); };
+
+// Staleness pill on "Inferred sessions": any spec edit nulls sessionData,
+// but nothing told the user their overlay died until now.
+function syncStaleBadge() {
+  const btn = document.getElementById('viewSessions');
+  const stale = sessionData === null && state.moves.length > 0;
+  btn.classList.toggle('stale', stale);
+  btn.title = stale
+    ? 'sessions are stale \\u2014 the spec changed since the last compile; '
+      + 'press "Compile & validate" to refresh'
+    : 'sessions the engine infers (S0\\u2026S3) \\u2014 Compile first';
+}
+const origSaveLocal = saveLocal;
+saveLocal = function () {
+  origSaveLocal();
+  syncStaleBadge();
+  annotateMoveTimes();     // keep date labels live while t/base/step are typed
+};
+setInterval(syncStaleBadge, 600);      // compile finishes async; catch it too
+syncStaleBadge();
+annotateMoveTimes();
+
+// Keep the guide honest about the deployment-added features.
+const guideActions = document.querySelector('#guideModal .guide-actions');
+const gh = document.createElement('h3');
+gh.textContent = 'Built-in campaign & session graph';
+const gp = document.createElement('p');
+gp.innerHTML = 'Pick <b>Unraveled Attack Model (read only)</b> in the Topology menu '
+  + 'to explore the real Unraveled campaign: 2,272 network-flow alerts condensed '
+  + 'to one move per distinct attacker/src/dst/technique, plus host-log '
+  + 'detections drawn as footholds and self-loops. It is view-only \\u2014 replay '
+  + 'it, compile it, then pick any other topology to return to your own scenario. '
+  + '<b>Session evolution \\u2197</b> (top bar) opens the attribution graph for '
+  + 'whatever is on screen, in a new tab.';
+guideActions.parentNode.insertBefore(gh, guideActions);
+guideActions.parentNode.insertBefore(gp, guideActions);
 })();
 </script>
 """
