@@ -104,9 +104,17 @@ def split_by_target_zone(sessions: List[Session], mapper, zone_of,
          downstream zone campaign (that would need host-login provenance we do not
          have here), so the foothold is shown compromised by N distinct origins
          without guessing which origin fed which objective.
-      3. ATTACH each remaining non-crossing event (intra-zone move) to the
-         nearest-in-time anchor within time_window_ms; if none is in range it
-         goes to an "__unattributed__" thread (honest: no signal => no guess).
+      3. ATTACH each remaining non-crossing event (intra-zone move) by ZONE
+         AFFINITY first: if its destination zone already names an objective
+         thread, join it -- no timing needed, however far apart in time the
+         two events are (this is what makes the attach ordering-independent).
+         If the destination zone is a real zone but has NO objective thread
+         (e.g. a shared dead-end in a zone nobody crosses into), decline
+         rather than guess: send it straight to "__unattributed__" -- falling
+         back to nearest-in-time here would just reproduce the old
+         misattribution under interleaving. Only when the destination zone
+         itself is unresolvable does nearest-in-time remain the fallback,
+         since no zone signal exists to attach by.
       4. Rebuild one fresh Session per thread.
 
     Sessions whose crossings reach <= 1 distinct zone pass through unchanged.
@@ -139,7 +147,20 @@ def split_by_target_zone(sessions: List[Session], mapper, zone_of,
             if zone_of(ev.src_ip) is None and zone_of(ev.dst_ip) is not None:
                 threads.setdefault(f"__ingress__::{ev.src_ip}", []).append(ev)
                 continue
-            # 3. other non-crossing (intra-zone move) -> nearest anchor in time.
+            # 3. other non-crossing (intra-zone move): zone affinity first.
+            dst_zone = zone_of(ev.dst_ip)
+            if dst_zone in zones:
+                # destination already names an objective thread -- ordering
+                # cannot override this, so no timing check at all.
+                threads.setdefault(dst_zone, []).append(ev)
+                continue
+            if dst_zone is not None:
+                # a real zone, but nothing crosses into it (shared dead-end) --
+                # nothing distinguishes attackers here; decline, don't guess.
+                threads.setdefault("__unattributed__", []).append(ev)
+                continue
+            # destination zone unresolvable -> nearest-in-time is the only
+            # signal left.
             key = _nearest_sink(ev.time, anchors, time_window_ms)
             threads.setdefault(key or "__unattributed__", []).append(ev)
 
