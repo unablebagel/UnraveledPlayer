@@ -1,6 +1,6 @@
-projectKey=Sample-ReactJS
+projectKey=Sample-Python
 serverUrl=http://localhost:9000
 serverVersion=26.6.0.123539
-dashboardUrl=http://localhost:9000/dashboard?id=Sample-ReactJS
-ceTaskId=e9a4d733-9c80-4c7e-afe1-a41532862850
-ceTaskUrl=http://localhost:9000/api/ce/task?id=e9a4d733-9c80-4c7e-afe1-a41532862850
+dashboardUrl=http://localhost:9000/dashboard?id=Sample-Python
+ceTaskId=4a124bd0-32d6-4f23-af65-f1d6585b1acc
+ceTaskUrl=http://localhost:9000/api/ce/task?id=4a124bd0-32d6-4f23-af65-f1d6585b1acc
